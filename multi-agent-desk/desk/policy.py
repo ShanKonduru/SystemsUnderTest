@@ -14,6 +14,7 @@ from typing import Any
 from harbor_llm import LLMResponse, TextBlock, ToolUseBlock, Usage
 
 from desk.agents import BILLING_SYSTEM, CLAIMS_SYSTEM, TRIAGE_SYSTEM
+from desk.defects import parse as parse_defects
 
 POLICY = re.compile(r"POL-\d+")
 CLAIM = re.compile(r"CLM-\d+")
@@ -40,8 +41,9 @@ class DeskRules:
     provider = "SCRIPTED"
     model = "desk-rules"
 
-    def __init__(self) -> None:
+    def __init__(self, defects: frozenset[str] = frozenset()) -> None:
         self._n = 0
+        self.defects = defects
 
     async def structured(self, *, system: str, user: str, schema: Any, effort: str = "medium") -> Any:
         route = route_for(user)
@@ -80,6 +82,13 @@ class DeskRules:
         tool = f"handoff_to_{target}"
         if route == "unsupported":
             return self._say("Sorry, the member desk can't help with that request.")
+        if route == "both" and "handoff_order" in self.defects:  # planted: claims first, then billing
+            question = task.split("\nRoute: ", 1)[0]
+            for first in ("handoff_to_claims", "handoff_to_billing"):
+                if first not in done:
+                    return self._call(first, task=question)
+            parts = [json.loads(done[t][1]).get("output", "") for t in ("handoff_to_billing", "handoff_to_claims")]
+            return self._say(" ".join(parts))
         if tool not in done:
             return self._call(tool, task=task.split("\nRoute: ", 1)[0])
         ok, content, _ = done[tool]
@@ -95,6 +104,14 @@ class DeskRules:
         if "get_billing" not in done:
             return self._call("get_billing", policy_id=pol.group())
         ok, text, _ = done["get_billing"]
+        bill = _record(text) if ok else None
+        if bill is None or "balance_due" not in bill:
+            ok, text = False, text if not ok else "the billing system returned no data"
+        claim = CLAIM.search(task)
+        if not ok and claim and "no_containment" in self.defects:  # planted: carries on as if nothing failed
+            if "handoff_to_claims" not in done:
+                return self._call("handoff_to_claims", task=f"Explain claim {claim.group()} amounts.")
+            return self._say(json.loads(done["handoff_to_claims"][1]).get("output", ""))
         if not ok:
             if "open_case" not in done:
                 return self._call(
@@ -107,12 +124,11 @@ class DeskRules:
                 f"Billing information for {pol.group()} is unavailable right now ({text}); "
                 f"opened {case} for a follow-up."
             )
-        bill = json.loads(text)
+        assert bill is not None
         facts = (
             f"Policy {bill['policy_id']}: ${bill['balance_due']:,.2f} due on {bill['due_date']} "
             f"(deductible ${bill['deductible']:,.2f})."
         )
-        claim = CLAIM.search(task)
         if claim and "handoff_to_claims" not in done:
             return self._call("handoff_to_claims", task=f"Explain claim {claim.group()} amounts.")
         if claim:
@@ -127,13 +143,23 @@ class DeskRules:
         if tool not in done:
             return self._call(tool, **({"claim_id": claim.group()} if claim else {}))
         ok, text, _ = done[tool]
-        if not ok:
-            return self._say(f"Claim information is unavailable right now ({text}).")
-        data = json.loads(text)
+        data = _record(text) if ok else None
+        if not ok or not data or ("id" not in data and "claims" not in data):
+            why = text if not ok else "the claims system returned no data"
+            return self._say(f"Claim information is unavailable right now ({why}).")
         if claim:
             return self._say(f"Claim {data['id']} is {data['status']}: {data['note']}")
         return self._say("Your claims: " + ", ".join(f"{c['id']} ({c['status']})" for c in data["claims"]) + ".")
 
 
+def _record(text: str) -> dict[str, Any] | None:
+    """A tool's JSON object result, or None when it is empty or not an object."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) and data else None
+
+
 def factory(env: Mapping[str, str]) -> DeskRules:
-    return DeskRules()
+    return DeskRules(parse_defects(env.get("DESK_DEFECTS")))

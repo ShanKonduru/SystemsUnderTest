@@ -16,8 +16,9 @@ with every handoff, and every tool call is verified and audited with the full ch
 **How identity propagates:**
 1. The tool server issues the first token for a member: their id, the permissions registered for them, and
    `chain: ["triage"]`.
-2. Each handoff re-signs the token for the receiving agent. The chain grows by one entry, and permissions can
-   only narrow, never widen.
+2. Each handoff re-signs the token for the receiving agent. The chain grows by one entry, and permissions
+   narrow to the receiving role's: billing gets `billing:read`, `claims:read`, `cases:write`; claims gets
+   `claims:read`, `cases:write`. They never widen.
 3. The tool server verifies every token and refuses one that claims more than the member holds.
 4. A specialist only accepts a token delegated to it, so the last entry of the chain must be its own name.
 5. Each tool call is written to `audit_log` with the member, the acting agent and the whole chain.
@@ -58,6 +59,31 @@ reachable only inside the compose network.
 | `DESK_ALLOWED_HOSTS` | `localhost:*,127.0.0.1:*,desk-tools:*` | Host names the MCP endpoint accepts (DNS-rebinding protection) |
 | `DESK_FAULT_DELAY`, `DESK_MAX_STEPS`, `DESK_TODAY` | `2`, `8`, `2026-11-03` | Timeout-fault delay; per-agent loop limit; fixed date |
 | `LLM_TIMEOUT`, `LLM_MAX_RETRIES` | `120`, `2` | Bound on every model call (all apps) |
+| `DESK_DEFECTS` | (empty) | **Test runs only.** A "buggy build": comma-separated planted defects (below) |
+
+## Observed deployment
+
+`docker-compose.observed.yml` adds TruAssure's recording MCP proxy in front of the tool server (`desk-proxy`, port
+`127.0.0.1:9410`) and its agent-to-agent tap in front of billing and claims (`desk-tap`, `127.0.0.1:9510`). It
+points the agents at them. Tool calls are logged to `data/proxy-logs/` and handoffs to `data/a2a-logs/`, each
+with the member and agent read from the identity token. Faults can be armed on both with `TA_PROXY_TOKEN`.
+
+```bat
+docker compose -f SUT\multi-agent-desk\docker-compose.yml -f SUT\multi-agent-desk\docker-compose.observed.yml up -d --build
+```
+
+## Planted defects (buggy build)
+
+`DESK_DEFECTS` switches on defects that copy real multi-agent failures ([`desk/defects.py`](desk/defects.py)).
+An unknown name is an error.
+
+| Defect | Where | What it does |
+|---|---|---|
+| `handoff_order` | scripted model | triage hands a two-part question to claims first, then to billing |
+| `no_containment` | scripted model | billing hands off to claims after its own lookup failed, and opens no case |
+| `wrong_member` | agents | billing delegates to claims for a different member |
+| `no_narrowing` | agents | handoffs keep every permission instead of narrowing to the receiving role's |
+| `trace_omits_hop` | agents | triage's account leaves out the handoffs its specialists made |
 
 ## Develop and test
 
@@ -68,7 +94,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest -q --cov
 ```
 
-There are 32 offline tests at 98.9% coverage, with a 95% gate. They cover identity signing and delegation, the
+There are 40 offline tests at 99.0% coverage, with a 95% gate. They cover identity signing and delegation, the
 backend's checks, every tool and fault mode, the three agents together, and an end-to-end run over HTTP with
 four local servers, including a cascading failure.
 

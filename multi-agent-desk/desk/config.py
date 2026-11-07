@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from desk.defects import parse as parse_defects
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 try:  # local runs: load the nearest .env; real environment variables win
@@ -43,6 +45,8 @@ class Settings:
         ]
     )
     signing_key_env: str = field(default_factory=lambda: _env("DESK_SIGNING_KEY"))
+    # planted defects for test runs ("buggy build"); empty in production. See desk.defects.
+    defects: frozenset[str] = field(default_factory=lambda: parse_defects(_env("DESK_DEFECTS")))
 
     @property
     def db_path(self) -> Path:

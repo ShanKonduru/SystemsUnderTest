@@ -1,0 +1,72 @@
+# Observed deployment: TruAssure's recording MCP proxy sits in front of the tool server, and its agent-to-agent
+# tap in front of the billing and claims agents.
+#   docker compose -f SUT/multi-agent-desk/docker-compose.yml -f SUT/multi-agent-desk/docker-compose.observed.yml up -d --build
+# Tool calls (with the identity token's member and agent) go to data/proxy-logs/, handoffs to data/a2a-logs/.
+# Faults are armed on 127.0.0.1:${DESK_PROXY_PORT:-9410} (tools) and 127.0.0.1:${DESK_TAP_PORT:-9510} (agents)
+# with TA_PROXY_TOKEN.
+x-observer: &observer
+  build:
+    context: ../..
+    dockerfile: docker/proxy.Dockerfile
+  image: truassure/proxy:dev
+  environment:
+    TA_PROXY_TOKEN: ${TA_PROXY_TOKEN:-}
+  restart: unless-stopped
+
+x-observed-agent: &observed-agent
+  DESK_TODAY: ${DESK_TODAY:-2026-11-03}
+  DESK_TOOLS_URL: http://desk-proxy:9400
+  DESK_BILLING_URL: http://desk-tap:9500/billing
+  DESK_CLAIMS_URL: http://desk-tap:9500/claims
+  DESK_MAX_STEPS: ${DESK_MAX_STEPS:-8}
+  DESK_DEFECTS: ${DESK_DEFECTS:-}        # test runs only: a "buggy build" (see desk/defects.py)
+
+services:
+  desk-proxy:
+    <<: *observer
+    command: ["--upstream", "http://desk-tools:9300", "--listen", "0.0.0.0:9400", "--allow-remote",
+              "--log-dir", "/logs", "--identity-header", "X-Identity"]
+    volumes:
+      - ./data/proxy-logs:/logs
+    ports:
+      - "127.0.0.1:${DESK_PROXY_PORT:-9410}:9400"
+    depends_on:
+      desk-tools: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9400/_ta/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  desk-tap:
+    <<: *observer
+    entrypoint: ["ta", "a2a"]
+    command: ["--route", "billing=http://desk-billing:8301", "--route", "claims=http://desk-claims:8302",
+              "--listen", "0.0.0.0:9500", "--allow-remote", "--log-dir", "/logs", "--identity-header", "X-Identity"]
+    volumes:
+      - ./data/a2a-logs:/logs
+    ports:
+      - "127.0.0.1:${DESK_TAP_PORT:-9510}:9500"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9500/_ta/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  desk-claims:
+    environment: *observed-agent
+    depends_on:
+      desk-proxy: {condition: service_healthy}
+
+  desk-billing:
+    environment: *observed-agent
+    depends_on:
+      desk-proxy: {condition: service_healthy}
+
+  desk-triage:
+    environment: *observed-agent
+    depends_on:
+      desk-proxy: {condition: service_healthy}
+      desk-tap: {condition: service_healthy}
