@@ -132,3 +132,15 @@ async def test_connection_failures_name_the_real_cause(settings):
         {"type": "claim.document_received", "claim_id": "CLM-5003"}, "adjuster-07"
     )
     assert ep.error == "ConnectionError: Invalid Host header"
+
+
+async def test_an_empty_or_unreadable_claim_changes_nothing():
+    """A claim lookup that answers with nothing usable (e.g. an injected empty result) ends cleanly, unchanged."""
+    llm = RulesLLM()
+    first = {"role": "user", "content": 'Event:\n{"claim_id": "CLM-5003", "type": "x"}\n\nProcedure: claims_intake\n'}
+    use = ToolUseBlock(id="t1", name="get_claim", input={"claim_id": "CLM-5003"})
+    for text in ("{}", "", "not json", "[1, 2]"):
+        result = {"type": "tool_result", "tool_use_id": "t1", "content": text, "is_error": False}
+        msgs = [first, {"role": "assistant", "content": [use]}, {"role": "user", "content": [result]}]
+        reply = await llm.create(messages=msgs)
+        assert reply.stop_reason == "end_turn" and "empty or unreadable" in reply.content[0].text

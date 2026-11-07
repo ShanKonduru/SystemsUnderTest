@@ -79,7 +79,12 @@ class RulesLLM:
         _, ok, text = done["get_claim"]
         if not ok:
             return self._say(f"No changes: could not read claim {cid} ({text}).")
-        claim = json.loads(text)
+        try:
+            claim = json.loads(text)
+        except json.JSONDecodeError:
+            claim = None
+        if not isinstance(claim, dict) or "status" not in claim:
+            return self._say(f"No changes: claim {cid} came back empty or unreadable.")
         failed = [f"{n} failed: {t}" for n, (_, good, t) in done.items() if not good and n != "add_note"]
         if route == "claims_intake":
             return self._intake(cid, claim, event, done, failed)
