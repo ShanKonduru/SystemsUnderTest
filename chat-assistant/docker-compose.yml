@@ -1,0 +1,32 @@
+# Harbor Mutual chat assistant (system under test).
+#   docker compose -f SUT/chat-assistant/docker-compose.yml up -d --build
+#   open http://127.0.0.1:8000
+# LLM settings come from the repo root's .env (DEFAULT_LLM_PROVIDER, or CHAT_LLM_PROVIDER for this app only).
+name: harbor-chat-assistant
+
+services:
+  chat-assistant:
+    build:
+      context: ..
+      dockerfile: chat-assistant/Dockerfile
+    image: harbor-mutual/chat-assistant:dev
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      COPILOT_DB: /app/data/insurance.db
+      COPILOT_MCP_TRANSPORT: stdio
+      # Fixed "today" so dates in answers are reproducible between runs; override in .env if you like.
+      COPILOT_TODAY: ${CHAT_TODAY:-2026-11-03}
+      # Test-control endpoints (/sandbox/status, /sandbox/reset) are on, but need CHAT_SANDBOX_TOKEN from .env;
+      # with no token set they refuse every request.
+      COPILOT_SANDBOX: "1"
+      COPILOT_SANDBOX_TOKEN: ${CHAT_SANDBOX_TOKEN:-}
+    ports:
+      - "127.0.0.1:${CHAT_PORT:-8000}:8000"   # localhost only
+    volumes:
+      - chat-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  chat-data:

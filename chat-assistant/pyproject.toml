@@ -1,0 +1,38 @@
+[project]
+name = "harbor-chat-assistant"
+version = "0.1.0"
+description = "Harbor Mutual customer chat assistant (demo system under test): intent routing, MCP tools, SQLite backend."
+requires-python = ">=3.11"
+dependencies = [
+    "harbor-llm[all]",          # SUT/common/harbor_llm, installed from the local path (see requirements.txt)
+    "mcp>=2.3",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pyyaml>=6",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-cov>=5.0", "httpx>=0.27", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+source = ["insurance_copilot"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]  # ruff's defaults: the app keeps its original style

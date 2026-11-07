@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor Mutual Assistant</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #1d2433; --muted: #6b7385; --line: #e3e6ec;
+    --brand: #26357f; --accent: #f08a1c; --err: #c0392b; --ok: #1f8a4c;
+    --user: #26357f; --userink: #fff; --bot: #eef0f5; --active: #e8ebf7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --panel:#1a1f29; --ink:#e6e9ef; --muted:#9aa3b5; --line:#2b3240;
+            --brand:#8fa0ff; --user:#3a4aa8; --bot:#232a37; --err:#ff7b6b; --ok:#4cc38a; --active:#252c3d; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--ink); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+  button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  button:disabled { opacity: .5; cursor: default; }
+  input { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+  [hidden] { display: none !important; }
+
+  /* login */
+  #login { min-height: 100%; display: grid; place-items: center; padding: 16px; }
+  #login form { width: 100%; max-width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 12px; }
+  #login h1 { margin: 0 0 4px; font-size: 18px; color: var(--brand); }
+  #login .err { color: var(--err); font-size: 13px; min-height: 18px; }
+
+  /* app */
+  #app { height: 100%; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  aside .top { padding: 12px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
+  aside .brand { font-weight: 700; color: var(--brand); }
+  #convList { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-content: start; }
+  .conv { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; cursor: pointer; min-width: 0; }
+  .conv:hover, .conv.active { background: var(--active); }
+  .conv .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conv .when { font-size: 11px; color: var(--muted); }
+  .conv .del { border: none; background: none; padding: 2px 6px; color: var(--muted); visibility: hidden; }
+  .conv:hover .del { visibility: visible; }
+  aside .bottom { padding: 12px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  main header { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; gap: 10px; }
+  main header .title { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #menuBtn { display: none; }
+  #conn { font-size: 12px; color: var(--muted); }
+  #conn.bad { color: var(--err); }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: min(720px, 85%); padding: 9px 13px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--user); color: var(--userink); border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: var(--bot); border-bottom-left-radius: 4px; }
+  .msg.sys { align-self: center; color: var(--muted); font-size: 12px; background: none; padding: 2px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 420px; }
+  .confirm { align-self: flex-start; max-width: min(720px, 90%); border: 1px solid var(--accent); border-radius: 12px; padding: 12px; background: var(--panel); }
+  .confirm code { display: block; margin: 6px 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+  .confirm .row { display: flex; gap: 8px; }
+  .confirm .hint { margin: -4px 0 10px; font-size: 13px; color: var(--muted, #888); }
+  #status { padding: 0 16px 6px; color: var(--muted); font-size: 12px; min-height: 18px; }
+  #form { display: flex; gap: 8px; padding: 12px 16px 16px; }
+  #form #input { flex: 1; }
+  #pending { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; max-width: 100%; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip button { border: none; background: none; padding: 0 2px; color: var(--muted); }
+  .msg a.doc { color: inherit; text-decoration: underline; display: block; margin-top: 4px; }
+
+  @media (max-width: 760px) {
+    #app { grid-template-columns: 1fr; }
+    aside { position: fixed; inset: 0 25% 0 0; z-index: 5; box-shadow: 0 0 24px rgba(0,0,0,.25); }
+    #menuBtn { display: inline-block; }
+  }
+</style>
+</head>
+<body>
+<section id="login" hidden>
+  <form id="loginForm">
+    <h1>Harbor Mutual</h1>
+    <div class="muted">Sign in to chat with your insurance assistant.</div>
+    <input id="username" placeholder="Username" autocomplete="username" required>
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="err" id="loginErr"></div>
+    <button class="primary">Sign in</button>
+    <button type="button" id="guestBtn">New to Harbor Mutual? Continue as a guest</button>
+  </form>
+</section>
+
+<section id="app" hidden>
+  <aside id="sidebar">
+    <div class="top">
+      <div class="brand">Harbor Mutual</div>
+      <button class="primary" id="newChat">+ New chat</button>
+    </div>
+    <div id="convList"></div>
+    <div class="bottom"><span id="who"></span><button id="logout">Sign out</button></div>
+  </aside>
+  <main>
+    <header>
+      <button id="menuBtn" aria-label="Chats">☰</button>
+      <div class="title" id="chatTitle">New chat</div>
+      <span id="conn"></span>
+    </header>
+    <div id="messages"></div>
+    <div id="status"></div>
+    <div id="pending"></div>
+    <form id="form">
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" multiple hidden>
+      <button type="button" id="attachBtn" title="Attach a proof document (PDF, JPG, PNG, WebP; max 5 MB)" aria-label="Attach document">📎</button>
+      <input id="input" autocomplete="off" placeholder="Ask about your policies, claims, billing, or buy a new policy…">
+      <button class="primary" id="sendBtn">Send</button>
+    </form>
+  </main>
+</section>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let me = null, convId = null, ws = null, busy = false, retry = 0, reconnectTimer = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {headers: {"Content-Type": "application/json"}, ...opts});
+  if (r.status === 401 && path !== "/api/login") { showLogin(); throw new Error("signed out"); }
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+// ---------------------------------------------------------------- login
+function showLogin() {
+  closeSocket(); me = null;
+  $("#app").hidden = true; $("#login").hidden = false; $("#username").focus();
+}
+$("#loginForm").onsubmit = async (e) => {
+  e.preventDefault(); $("#loginErr").textContent = "";
+  try {
+    me = await api("/api/login", {method: "POST", body: JSON.stringify({username: $("#username").value, password: $("#password").value})});
+    $("#password").value = ""; startApp();
+  } catch (err) { $("#loginErr").textContent = err.message; }
+};
+$("#guestBtn").onclick = async () => {
+  $("#loginErr").textContent = "";
+  try { me = await api("/api/guest", {method: "POST"}); startApp(); }
+  catch (err) { $("#loginErr").textContent = err.message; }
+};
+$("#logout").onclick = async () => { await api("/api/logout", {method: "POST"}).catch(() => {}); showLogin(); };
+
+// ---------------------------------------------------------------- conversations
+function when(iso) {
+  const d = new Date(iso), now = new Date();
+  return d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : d.toLocaleDateString();
+}
+async function loadConversations() {
+  const convs = await api("/api/conversations");
+  $("#convList").innerHTML = convs.length ? "" : '<div class="muted" style="padding:8px">No chats yet.</div>';
+  for (const c of convs) {
+    const el = document.createElement("div");
+    el.className = "conv" + (c.id === convId ? " active" : "");
+    el.innerHTML = `<span class="title">${esc(c.title)}</span><span class="when">${esc(when(c.updated_at))}</span><button class="del" title="Delete chat">✕</button>`;
+    el.onclick = () => openConversation(c.id, c.title);
+    el.querySelector(".del").onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!confirmDelete(c.title)) return;
+      await api(`/api/conversations/${c.id}`, {method: "DELETE"});
+      if (c.id === convId) startNewChat();
+      loadConversations();
+    };
+    $("#convList").appendChild(el);
+  }
+  return convs;
+}
+function confirmDelete(title) { return window.confirm(`Delete "${title}"?`); }
+
+async function openConversation(id, title) {
+  convId = id; $("#chatTitle").textContent = title || "Chat"; pendingDocs = []; renderPending();
+  if (matchMedia("(max-width: 760px)").matches) $("#sidebar").hidden = true;
+  $("#messages").innerHTML = "";
+  const msgs = await api(`/api/conversations/${id}/messages`);
+  if (!msgs.length) renderEmpty();
+  for (const m of msgs) addMsg(m.text, m.role === "user" ? "user" : "bot");
+  document.querySelectorAll(".conv").forEach(el => el.classList.remove("active"));
+  loadConversations();
+  connect();
+}
+// A new chat is only saved once the first message is sent (see the form handler).
+function startNewChat() {
+  closeSocket(); convId = null; retry = 0; setConn(""); pendingDocs = []; renderPending();
+  $("#chatTitle").textContent = "New chat";
+  document.querySelectorAll(".conv").forEach(el => el.classList.remove("active"));
+  renderEmpty(); setBusy(false);
+  if (matchMedia("(max-width: 760px)").matches) $("#sidebar").hidden = true;
+}
+$("#newChat").onclick = startNewChat;
+$("#menuBtn").onclick = () => { $("#sidebar").hidden = !$("#sidebar").hidden; };
+
+// ---------------------------------------------------------------- chat
+function renderEmpty() {
+  $("#messages").innerHTML = (me?.customer_id || "").startsWith("REP-")
+    ? `<div class="empty">Hi ${esc(me?.display_name || "")}. Representative console: find and verify a customer (name, email, customer or policy id, then their date of birth and ZIP), service their policies within your role, add notes and follow-ups, or work your queue (approvals, applications, cases).</div>`
+    : (me?.customer_id || "").startsWith("GUEST-")
+    ? `<div class="empty">Hi! You're chatting as a guest. I can explain our insurance, give you a quote, help you apply, or connect you with a representative. Already a customer? Sign out and sign in to see your account.</div>`
+    : `<div class="empty">Hi ${esc(me?.display_name || "")}! I can show your policies, file a claim, pay a bill, change coverage, send a policy document, or quote and buy a new policy.</div>`;
+}
+const DOC_LINE = /^\[Attached document (DOC-\d+): (.+) \(([^,]+), (\d+) KB\)\]$/;
+function addMsg(text, cls) {
+  $("#messages").querySelector(".empty")?.remove();
+  const el = document.createElement("div"); el.className = "msg " + cls;
+  // Attachment lines become links to the stored document.
+  const lines = String(text).split("\n"), body = [];
+  for (const line of lines) {
+    const m = line.match(DOC_LINE);
+    if (m) {
+      const a = document.createElement("a"); a.className = "doc"; a.target = "_blank";
+      a.href = `/api/documents/${m[1]}`; a.textContent = `📎 ${m[2]} (${m[4]} KB)`;
+      el.appendChild(a);
+    } else body.push(line);
+  }
+  // Links to documents Harbor Mutual issued (only the signed-in customer can open them).
+  const frag = document.createDocumentFragment();
+  body.join("\n").split(/(\/api\/documents\/DOC-\d+)/).forEach((part, i) => {
+    if (i % 2) {
+      const a = document.createElement("a"); a.target = "_blank"; a.href = part; a.textContent = part;
+      frag.appendChild(a);
+    } else frag.appendChild(document.createTextNode(part));
+  });
+  el.prepend(frag);
+  $("#messages").appendChild(el); el.scrollIntoView({block: "end"}); return el;
+}
+
+// ---------------------------------------------------------------- attachments
+let pendingDocs = [];
+function renderPending() {
+  $("#pending").innerHTML = "";
+  pendingDocs.forEach((d, i) => {
+    const chip = document.createElement("span"); chip.className = "chip";
+    chip.innerHTML = `📎 <span>${esc(d.filename)}</span><button type="button" title="Remove">✕</button>`;
+    chip.querySelector("button").onclick = () => { pendingDocs.splice(i, 1); renderPending(); };
+    $("#pending").appendChild(chip);
+  });
+}
+async function ensureConversation() {
+  if (convId) return;
+  const c = await api("/api/conversations", {method: "POST"});
+  convId = c.id;
+  await new Promise(r => { connect(); const t = setInterval(() => { if (ws?.readyState === 1) { clearInterval(t); r(); } }, 50); });
+}
+$("#attachBtn").onclick = () => $("#fileInput").click();
+$("#fileInput").onchange = async () => {
+  const files = [...$("#fileInput").files]; $("#fileInput").value = "";
+  if (!files.length) return;
+  await ensureConversation();
+  for (const f of files) {
+    $("#status").textContent = `Uploading ${f.name}…`;
+    try {
+      const r = await fetch(`/api/conversations/${convId}/documents?filename=${encodeURIComponent(f.name)}`,
+                            {method: "POST", headers: {"Content-Type": f.type || "application/octet-stream"}, body: f});
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Upload failed");
+      pendingDocs.push(data); renderPending();
+    } catch (err) { addMsg(`Could not upload ${f.name}: ${err.message}`, "sys"); }
+  }
+  $("#status").textContent = ""; $("#input").focus();
+};
+function setBusy(b) {
+  busy = b; $("#sendBtn").disabled = b;
+  if (!b) { $("#status").textContent = ""; $("#input").focus(); }
+}
+function setConn(text, bad = false) { $("#conn").textContent = text; $("#conn").className = bad ? "bad" : ""; }
+
+function closeSocket() {
+  clearTimeout(reconnectTimer);
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+}
+function connect() {
+  closeSocket();
+  if (!convId) return;
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const sock = new WebSocket(`${proto}://${location.host}/ws?conversation=${encodeURIComponent(convId)}`);
+  ws = sock; setConn("connecting…");
+  sock.onmessage = (m) => { const {type, data} = JSON.parse(m.data); onEvent(type, data); };
+  sock.onclose = async (e) => {
+    if (ws !== sock) return;
+    ws = null; setBusy(busy);
+    if (e.code === 4401) return showLogin();
+    if (e.code === 4404) { setConn("chat not found", true); return; }
+    // Auto-reconnect with backoff; the conversation is saved on the server, so nothing is lost.
+    const delay = Math.min(1000 * 2 ** retry++, 15000);
+    setConn(`reconnecting in ${Math.round(delay / 1000)}s…`, true);
+    reconnectTimer = setTimeout(async () => {
+      if (busy) {  // a reply may have finished while we were away: reload history
+        busy = false;
+        const msgs = await api(`/api/conversations/${convId}/messages`).catch(() => null);
+        if (msgs) { $("#messages").innerHTML = ""; msgs.forEach(m => addMsg(m.text, m.role === "user" ? "user" : "bot")); }
+      }
+      connect();
+    }, delay);
+  };
+}
+
+function onEvent(type, d) {
+  switch (type) {
+    case "ready": retry = 0; setConn(""); setBusy(false); break;
+    case "status": $("#status").textContent = d.text; break;
+    case "awaiting_confirmation": {
+      const box = document.createElement("div"); box.className = "confirm";
+      box.innerHTML = `<b>${d.destructive ? "⚠ " : ""}${d.level === "submit" ? "Please approve this request" : "Please approve this action"}</b><code>${esc(d.summary)}</code>${d.level === "submit" ? `<div class="hint">${esc(d.effect)}</div>` : ""}${d.disclosure ? `<div class="hint"><b>${(me?.customer_id || "").startsWith("REP-") ? "Read to the customer; approving confirms they accepted:" : "By approving you agree:"}</b> ${esc(d.disclosure)}</div>` : ""}<div class="row"><button class="primary">Approve</button><button>Decline</button></div>`;
+      const [yes, no] = box.querySelectorAll("button");
+      const answer = (ok) => {
+        ws?.send(JSON.stringify({type: "confirm", key: d.key, approved: ok}));
+        box.querySelector(".row").innerHTML = `<span style="color:var(${ok ? "--ok" : "--err"})">${ok ? "Approved" : "Declined"}</span>`;
+      };
+      yes.onclick = () => answer(true); no.onclick = () => answer(false);
+      $("#messages").appendChild(box); box.scrollIntoView({block: "end"}); break;
+    }
+    case "assistant_message": addMsg(d.text, "bot"); break;
+    case "turn_completed":
+      setBusy(false);
+      loadConversations().then(cs => { const c = cs.find(x => x.id === convId); if (c) $("#chatTitle").textContent = c.title; });
+      break;
+    case "error": addMsg(d.message, "sys"); break;
+  }
+}
+
+$("#form").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("#input").value.trim(); if ((!text && !pendingDocs.length) || busy) return;
+  await ensureConversation();
+  if (!ws || ws.readyState !== 1) { addMsg("Not connected yet — please try again in a moment.", "sys"); return; }
+  const docs = pendingDocs; pendingDocs = []; renderPending();
+  const shown = [text || (docs.length === 1 ? "Here is the document." : "Here are the documents."),
+                 ...docs.map(d => `[Attached document ${d.document_id}: ${d.filename} (${d.content_type}, ${Math.max(1, Math.round(d.size_bytes / 1024))} KB)]`)];
+  addMsg(shown.join("\n"), "user"); $("#input").value = ""; setBusy(true); $("#status").textContent = "Thinking…";
+  ws.send(JSON.stringify({type: "user", text, attachments: docs.map(d => d.document_id)}));
+};
+
+async function startApp() {
+  $("#login").hidden = true; $("#app").hidden = false;
+  $("#who").textContent = me.display_name;
+  convId = null;
+  // Show the user's previous chats and continue the most recently active one.
+  const convs = await loadConversations();
+  if (convs.length) openConversation(convs[0].id, convs[0].title);
+  else startNewChat();
+}
+
+(async () => {
+  try { me = await api("/api/me"); startApp(); } catch { showLogin(); }
+})();
+</script>
+</body>
+</html>
