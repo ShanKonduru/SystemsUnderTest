@@ -33,5 +33,5 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest -q
 ```
 
-The 120 offline tests use a scripted fake LLM, so they need no keys. The app gets its LLM from the shared factory
+The 208 offline tests (99% line-and-branch coverage, 95% gate) use a scripted fake LLM, so they need no keys. Two known app bugs are pinned as strict expected failures (`xfail`): a planner failure crashes the turn, and the REST RPC fallback leaks its `{tool}` path segment into the tool arguments. The app gets its LLM from the shared factory
 ([`../common/harbor_llm`](../common/harbor_llm)), so any provider configured in `.env` works.
