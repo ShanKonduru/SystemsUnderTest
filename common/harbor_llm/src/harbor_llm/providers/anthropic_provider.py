@@ -28,13 +28,20 @@ class AnthropicLLM:
         use_fallbacks: bool = True,
         client: Any | None = None,
         api_key: str | None = None,
+        timeout: float = 120.0,
+        max_retries: int = 2,
     ) -> None:
         if client is None:
             try:
                 import anthropic
             except ImportError as exc:  # pragma: no cover - depends on installed extras
                 raise ImportError("provider ANTHROPIC needs: pip install 'harbor-llm[anthropic]'") from exc
-            client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else anthropic.AsyncAnthropic()
+            limits: dict[str, Any] = {"timeout": timeout, "max_retries": max_retries}
+            client = (
+                anthropic.AsyncAnthropic(api_key=api_key, **limits)
+                if api_key
+                else anthropic.AsyncAnthropic(**limits)
+            )
         self.client = client
         self.model = model
         self.use_fallbacks = use_fallbacks and model in FALLBACK_MODELS

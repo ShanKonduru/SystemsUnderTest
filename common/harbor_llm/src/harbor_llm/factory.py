@@ -16,7 +16,8 @@ Providers and the settings each reads (all from the environment / ``.env``; noth
 | SCRIPTED            | OFFLINE, FAKE                | LLM_SCRIPT or LLM_SCRIPT_FILE                                         |
 
 ``LLM_MODEL`` overrides the provider's model setting; ``LLM_TEMPERATURE`` is sent only where the provider
-accepts it (never to Claude).
+accepts it (never to Claude). ``LLM_TIMEOUT`` (seconds, default 120) and ``LLM_MAX_RETRIES`` (default 2) bound
+every request on every provider.
 """
 
 from __future__ import annotations
@@ -101,6 +102,16 @@ def _model(env: Mapping[str, str], provider: str, own: str, model: str | None) -
     )
 
 
+def limits(env: Mapping[str, str]) -> dict[str, Any]:
+    """Per-request timeout (LLM_TIMEOUT seconds, default 120) and retries (LLM_MAX_RETRIES, default 2), so one slow
+    call can never block an agent for long. Every provider's client is built with these."""
+    timeout = float(env.get("LLM_TIMEOUT", "").strip() or 120)
+    retries = int(env.get("LLM_MAX_RETRIES", "").strip() or 2)
+    if timeout <= 0 or retries < 0:
+        raise ConfigError("LLM_TIMEOUT must be > 0 and LLM_MAX_RETRIES >= 0")
+    return {"timeout": timeout, "max_retries": retries}
+
+
 def _openai_client(**kwargs: Any) -> Any:
     try:
         import openai
@@ -117,6 +128,7 @@ def _build_anthropic(env: Mapping[str, str], model: str | None, client: Any) -> 
         use_fallbacks=_bool(env, "ANTHROPIC_FALLBACKS", True),
         client=client,
         api_key=env.get("ANTHROPIC_API_KEY") or None,
+        **limits(env),
     )
 
 
@@ -134,6 +146,7 @@ def _build_azure(env: Mapping[str, str], model: str | None, client: Any) -> Any:
             api_key=key,
             azure_endpoint=endpoint,
             api_version=env.get("AZURE_API_VERSION") or "2024-12-01-preview",
+            **limits(env),
         )
     return OpenAIChatLLM(
         provider="AZURE",
@@ -148,7 +161,7 @@ def _build_openai(env: Mapping[str, str], model: str | None, client: Any) -> Any
 
     if client is None:
         (key,) = _need(env, "OPENAI_API_KEY")
-        client = _openai_client(api_key=key, base_url=env.get("OPENAI_BASE_URL") or None)
+        client = _openai_client(api_key=key, base_url=env.get("OPENAI_BASE_URL") or None, **limits(env))
     return OpenAIChatLLM(
         provider="OPENAI",
         model=_model(env, "OPENAI", "OPENAI_MODEL", model),
@@ -163,7 +176,7 @@ def _build_ollama(env: Mapping[str, str], model: str | None, client: Any) -> Any
 
     if client is None:
         base = env.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
-        client = _openai_client(api_key="ollama", base_url=base)
+        client = _openai_client(api_key="ollama", base_url=base, **limits(env))
     return OpenAIChatLLM(
         provider="OLLAMA",
         model=_model(env, "OLLAMA", "OLLAMA_MODEL", model),
@@ -177,7 +190,9 @@ def _build_compatible(env: Mapping[str, str], model: str | None, client: Any) ->
 
     if client is None:
         (base,) = _need(env, "OPENAI_COMPATIBLE_BASE_URL")
-        client = _openai_client(api_key=env.get("OPENAI_COMPATIBLE_API_KEY") or "none", base_url=base)
+        client = _openai_client(
+            api_key=env.get("OPENAI_COMPATIBLE_API_KEY") or "none", base_url=base, **limits(env)
+        )
     name = model or env.get("LLM_MODEL", "").strip() or _need(env, "OPENAI_COMPATIBLE_MODEL")[0]
     return OpenAIChatLLM(
         provider="OPENAI_COMPATIBLE",
@@ -193,7 +208,11 @@ def _build_bedrock(env: Mapping[str, str], model: str | None, client: Any) -> An
     name = model or env.get("LLM_MODEL", "").strip() or _need(env, "BEDROCK_MODEL_ID")[0]
     region = env.get("AWS_REGION") or env.get("AWS_DEFAULT_REGION") or None
     return BedrockLLM(
-        model=name, client=client, region=region, temperature=_temperature(env, "LLM_TEMPERATURE")
+        model=name,
+        client=client,
+        region=region,
+        temperature=_temperature(env, "LLM_TEMPERATURE"),
+        **limits(env),
     )
 
 
@@ -213,6 +232,7 @@ def _build_gemini(env: Mapping[str, str], model: str | None, client: Any) -> Any
         client=client,
         api_key=env.get("GOOGLE_API_KEY"),
         temperature=_temperature(env, "LLM_TEMPERATURE"),
+        timeout=limits(env)["timeout"],
     )
 
 
@@ -229,6 +249,7 @@ def _build_vertex(env: Mapping[str, str], model: str | None, client: Any) -> Any
         project=project,
         location=env.get("GOOGLE_CLOUD_LOCATION") or "global",
         temperature=_temperature(env, "LLM_TEMPERATURE"),
+        timeout=limits(env)["timeout"],
     )
 
 

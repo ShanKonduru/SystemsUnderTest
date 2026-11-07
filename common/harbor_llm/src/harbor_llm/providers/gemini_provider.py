@@ -110,6 +110,7 @@ class GeminiLLM:
         project: str | None = None,
         location: str | None = None,
         temperature: float | None = None,
+        timeout: float = 120.0,
     ) -> None:
         self.provider = "VERTEX" if vertex else "GEMINI"
         if client is None:
@@ -117,10 +118,13 @@ class GeminiLLM:
                 from google import genai
             except ImportError as exc:  # pragma: no cover - depends on installed extras
                 raise ImportError("provider GEMINI needs: pip install 'harbor-llm[gemini]'") from exc
+            from google.genai import types
+
+            http = types.HttpOptions(timeout=int(timeout * 1000))  # milliseconds
             client = (
-                genai.Client(vertexai=True, project=project, location=location)
+                genai.Client(vertexai=True, project=project, location=location, http_options=http)
                 if vertex
-                else genai.Client(api_key=api_key)
+                else genai.Client(api_key=api_key, http_options=http)
             )
         self.client: Any = client
         self.model = model

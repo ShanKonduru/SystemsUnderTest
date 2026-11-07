@@ -97,13 +97,22 @@ class BedrockLLM:
         client: Any | None = None,
         region: str | None = None,
         temperature: float | None = None,
+        timeout: float = 120.0,
+        max_retries: int = 2,
     ) -> None:
         if client is None:
             try:
                 import boto3
             except ImportError as exc:  # pragma: no cover - depends on installed extras
                 raise ImportError("provider BEDROCK needs: pip install 'harbor-llm[bedrock]'") from exc
-            client = boto3.client("bedrock-runtime", region_name=region)
+            from botocore.config import Config
+
+            config = Config(
+                read_timeout=timeout,
+                connect_timeout=10,
+                retries={"total_max_attempts": max_retries + 1, "mode": "standard"},
+            )
+            client = boto3.client("bedrock-runtime", region_name=region, config=config)
         self.client = client
         self.model = model
         self.temperature = temperature

@@ -5,10 +5,10 @@ customer or company data is used anywhere. Each app has its own `docker-compose.
 
 | App | Folder | What it is | Status |
 |---|---|---|---|
-| LLM factory | [`common/harbor_llm`](common/harbor_llm) | One interface over every LLM provider, chosen by `DEFAULT_LLM_PROVIDER` | ready |
+| LLM factory | [`common/harbor_llm`](common/harbor_llm) | One interface over every LLM provider, chosen by `DEFAULT_LLM_PROVIDER`; bounded timeouts (`LLM_TIMEOUT`, `LLM_MAX_RETRIES`) | ready (99% coverage, 45 tests) |
 | Chat assistant | [`chat-assistant/`](chat-assistant) | Customer chat: web UI, MCP tool server, SQLite system of record | ready (99% coverage, verified live) |
 | Claims task agent | [`claims-agent/`](claims-agent) | Event-driven back-office agent (no chat): MCP tools over HTTP, SQLite, letters folder | ready (98.7% coverage, verified live) |
-| Multi-agent desk | `multi-agent-desk/` | Triage agent handing off to billing and claims agents, identity carried along | planned |
+| Multi-agent desk | [`multi-agent-desk/`](multi-agent-desk) | Triage agent handing off to billing and claims agents over HTTP, signed identity carried along, fault switch | ready (98.9% coverage, verified live) |
 
 ## Configure the LLM once
 
@@ -32,7 +32,7 @@ Secrets live only in `.env` (git-ignored) or your environment. They are never ba
 
 ## What has been verified
 
-The factory has 42 offline tests at 99% coverage. The Bedrock requests are checked against AWS's own service
+The factory has 45 offline tests at 99% coverage. The Bedrock requests are checked against AWS's own service
 model (botocore `Stubber`), and the Gemini requests against google-genai's own types. **Azure OpenAI is
 verified live** (tool call, tool result, answer, structured output). The other providers are verified
 offline only until someone runs them with keys.

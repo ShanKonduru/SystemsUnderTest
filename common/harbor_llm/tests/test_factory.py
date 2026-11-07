@@ -227,3 +227,44 @@ async def test_replay_file(tmp_path: Path) -> None:
     with pytest.raises(StructuredOutputError, match="exhausted"):
         await llm.create(messages=[])
     assert len(llm.calls) == 6
+
+
+def test_every_real_client_gets_a_bounded_timeout_and_retries() -> None:
+    env = {"LLM_TIMEOUT": "45", "LLM_MAX_RETRIES": "1"}
+    anth = make_llm(env={**env, "DEFAULT_LLM_PROVIDER": "ANTHROPIC", "ANTHROPIC_API_KEY": "k"})
+    anth_default = make_llm(env={"DEFAULT_LLM_PROVIDER": "ANTHROPIC"})
+    azure = make_llm(
+        env={
+            **env,
+            "DEFAULT_LLM_PROVIDER": "AZURE",
+            "AZURE_API_KEY": "k",
+            "AZURE_DEPLOYMENT": "d",
+            "AZURE_ENDPOINT": "https://x.example.com/",
+        }
+    )
+    oai = make_llm(env={**env, "DEFAULT_LLM_PROVIDER": "OPENAI", "OPENAI_API_KEY": "k"})
+    oll = make_llm(env={**env, "DEFAULT_LLM_PROVIDER": "OLLAMA"})
+    comp = make_llm(
+        env={
+            **env,
+            "DEFAULT_LLM_PROVIDER": "COMPATIBLE",
+            "OPENAI_COMPATIBLE_BASE_URL": "http://h/v1",
+            "OPENAI_COMPATIBLE_MODEL": "m",
+        }
+    )
+    for llm in (anth, azure, oai, oll, comp):
+        assert llm.client.timeout == 45 and llm.client.max_retries == 1, llm.provider
+    assert anth_default.client.timeout == 120 and anth_default.client.max_retries == 2
+    bed = make_llm(
+        env={**env, "DEFAULT_LLM_PROVIDER": "BEDROCK", "BEDROCK_MODEL_ID": "m", "AWS_REGION": "us-east-1"}
+    )
+    cfg = bed.client._client_config
+    assert cfg.read_timeout == 45 and cfg.retries["total_max_attempts"] == 2  # first try + 1 retry
+    gem = make_llm(env={**env, "DEFAULT_LLM_PROVIDER": "GEMINI", "GOOGLE_API_KEY": "k"})
+    assert gem.client._api_client._http_options.timeout == 45000
+
+
+@pytest.mark.parametrize("bad", [{"LLM_TIMEOUT": "0"}, {"LLM_MAX_RETRIES": "-1"}])
+def test_invalid_limits_are_rejected(bad: dict[str, str]) -> None:
+    with pytest.raises(ConfigError, match="LLM_TIMEOUT"):
+        make_llm(env={**bad, "DEFAULT_LLM_PROVIDER": "OLLAMA"})
