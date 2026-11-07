@@ -25,8 +25,5 @@ services:
     ports:
       - "127.0.0.1:${CHAT_PORT:-8000}:8000"   # localhost only
     volumes:
-      - chat-data:/app/data
+      - ./data:/app/data        # insurance.db, readable from the host (TruAssure snapshots it read-only)
     restart: unless-stopped
-
-volumes:
-  chat-data:

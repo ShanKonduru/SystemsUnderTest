@@ -21,8 +21,8 @@ docker compose -f SUT\chat-assistant\docker-compose.yml down        :: add -v to
 | `CHAT_TODAY` | `2026-11-03` | Fixed "today", so dates in answers are reproducible |
 | `CHAT_SANDBOX_TOKEN` | (empty) | Token for the test-control endpoints `/sandbox/status` and `/sandbox/reset`; empty refuses every request |
 
-The port is bound to `127.0.0.1` only. The database lives in the `chat-data` volume and is created and
-seeded on first start.
+The port is bound to `127.0.0.1` only. The database is `SUT/chat-assistant/data/insurance.db` (a bind mount,
+git-ignored), created and seeded on first start; TruAssure reads it read-only to diff state.
 
 ## Develop and test locally
 
