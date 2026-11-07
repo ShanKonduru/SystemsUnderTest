@@ -12,6 +12,8 @@ from typing import Any
 
 from harbor_llm import LLMResponse, TextBlock, ToolUseBlock, Usage
 
+from claims_agent.defects import parse as parse_defects
+
 ROUTES = {
     "claim.document_received": "claims_intake",
     "claim.assessment_completed": "claims_settlement",
@@ -37,8 +39,9 @@ class RulesLLM:
     provider = "SCRIPTED"
     model = "claims-rules"
 
-    def __init__(self) -> None:
+    def __init__(self, defects: frozenset[str] = frozenset()) -> None:
         self._ids = 0
+        self.defects = defects
 
     async def structured(self, *, system: str, user: str, schema: Any, effort: str = "medium") -> Any:
         event = _event(user)
@@ -50,6 +53,8 @@ class RulesLLM:
         first = _text(messages[0]["content"])
         event = _event(first)
         route = first.split("Procedure: ", 1)[1].split("\n", 1)[0]
+        if "loop" in self.defects:  # planted: never finishes
+            return self._call("get_claim", claim_id=str(event.get("claim_id", "")))
         done: dict[str, tuple[dict[str, Any], bool, str]] = {}
         names: dict[str, tuple[str, dict[str, Any]]] = {}
         for msg in messages[1:]:
@@ -113,7 +118,11 @@ class RulesLLM:
                 "write_letter",
                 claim_id=cid,
                 kind="acknowledgement",
-                body=f"We received document {doc} for claim {cid}. Your claim is now under review.",
+                body=(
+                    "We received your document. Your claim is now under review."  # planted: says nothing specific
+                    if "vague_letter" in self.defects
+                    else f"We received document {doc} for claim {cid}. Your claim is now under review."
+                ),
             )
         return self._say(f"Claim {cid} moved to under review; acknowledgement letter written for document {doc}.")
 
@@ -149,6 +158,8 @@ class RulesLLM:
                 kind="denial",
                 body=f"Your claim {cid} is denied: {done['update_claim'][0]['reason']}.",
             )
+        if "pay_on_settlement" in self.defects and status == "approved" and "make_payment" not in done:  # planted
+            return self._call("make_payment", claim_id=cid, amount=float(event["amount"]))
         return self._say(f"Claim {cid} {status}; {'approval' if status == 'approved' else 'denial'} letter written.")
 
     def _pay(self, cid: str, claim: dict[str, Any], done: dict[str, Any]) -> LLMResponse:
@@ -163,4 +174,4 @@ class RulesLLM:
 
 
 def factory(env: Mapping[str, str]) -> RulesLLM:
-    return RulesLLM()
+    return RulesLLM(parse_defects(env.get("CLAIMS_DEFECTS")))

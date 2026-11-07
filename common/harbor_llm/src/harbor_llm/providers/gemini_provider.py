@@ -116,9 +116,9 @@ class GeminiLLM:
         if client is None:
             try:
                 from google import genai
-            except ImportError as exc:  # pragma: no cover - depends on installed extras
+                from google.genai import types
+            except ImportError as exc:  # the provider's package is an optional extra
                 raise ImportError("provider GEMINI needs: pip install 'harbor-llm[gemini]'") from exc
-            from google.genai import types
 
             http = types.HttpOptions(timeout=int(timeout * 1000))  # milliseconds
             client = (

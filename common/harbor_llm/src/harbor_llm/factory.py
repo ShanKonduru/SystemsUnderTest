@@ -115,7 +115,7 @@ def limits(env: Mapping[str, str]) -> dict[str, Any]:
 def _openai_client(**kwargs: Any) -> Any:
     try:
         import openai
-    except ImportError as exc:  # pragma: no cover - depends on installed extras
+    except ImportError as exc:  # the provider's package is an optional extra
         raise ImportError("this provider needs: pip install 'harbor-llm[openai]'") from exc
     return openai.AsyncOpenAI(**kwargs)
 
@@ -140,7 +140,7 @@ def _build_azure(env: Mapping[str, str], model: str | None, client: Any) -> Any:
         key, endpoint = _need(env, "AZURE_API_KEY", "AZURE_ENDPOINT")
         try:
             import openai
-        except ImportError as exc:  # pragma: no cover - depends on installed extras
+        except ImportError as exc:  # the provider's package is an optional extra
             raise ImportError("provider AZURE needs: pip install 'harbor-llm[openai]'") from exc
         client = openai.AsyncAzureOpenAI(
             api_key=key,

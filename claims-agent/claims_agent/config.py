@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from claims_agent.defects import parse as parse_defects
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 try:  # local runs: load the nearest .env; real environment variables win
@@ -47,3 +49,9 @@ class Settings:
     )
     sandbox_token: str = field(default_factory=lambda: os.environ.get("CLAIMS_SANDBOX_TOKEN", ""))
     max_steps: int = field(default_factory=lambda: int(os.environ.get("CLAIMS_MAX_STEPS", "10")))
+    # OpenTelemetry GenAI spans (OTLP/JSON): a file to append to and/or an OTLP/HTTP endpoint (.../v1/traces)
+    otel_file: str = field(default_factory=lambda: os.environ.get("CLAIMS_OTEL_FILE", ""))
+    otel_endpoint: str = field(default_factory=lambda: os.environ.get("CLAIMS_OTEL_ENDPOINT", ""))
+    otel_token: str = field(default_factory=lambda: os.environ.get("CLAIMS_OTEL_TOKEN", ""))
+    # planted defects for test runs ("buggy build"); empty in production. See claims_agent.defects.
+    defects: frozenset[str] = field(default_factory=lambda: parse_defects(os.environ.get("CLAIMS_DEFECTS")))

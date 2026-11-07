@@ -42,6 +42,30 @@ git ignores, so you can inspect them from the host.
 | `CLAIMS_TOOLS_ALLOWED_HOSTS` | `localhost:*,127.0.0.1:*,claims-tools:*` | Host names the tool server accepts. DNS-rebinding protection stays on; add a proxy's name if you use one |
 | `CLAIMS_SANDBOX_TOKEN` | (empty) | Token for `/sandbox/status` and `/sandbox/reset`. When empty, both refuse every request |
 | `CLAIMS_TODAY`, `CLAIMS_MAX_STEPS` | `2026-11-03`, `10` | Fixed date; tool-loop limit |
+| `CLAIMS_OTEL_FILE` | `/app/data/otel/spans.jsonl` in Docker | Append the OpenTelemetry GenAI spans of each episode (OTLP/JSON); `data/otel/` on the host |
+| `CLAIMS_OTEL_ENDPOINT`, `CLAIMS_OTEL_TOKEN` | (empty) | Also post the spans to an OTLP/HTTP receiver (e.g. `ta otel`), with a bearer token |
+| `CLAIMS_DEFECTS` | (empty) | **Test runs only.** A "buggy build": comma-separated planted defects (below) |
+
+## Telemetry
+
+Each episode emits one `invoke_agent` span and one `execute_tool` span per tool call, with the GenAI
+semantic-convention attributes (`gen_ai.operation.name`, `gen_ai.tool.name`, `gen_ai.tool.call.id`,
+`gen_ai.tool.call.arguments`) and the principal as `enduser.id`. The spans record what the agent actually
+called, independently of the account it returns. Exporting never breaks an episode.
+
+## Planted defects (buggy build)
+
+`CLAIMS_DEFECTS` switches on defects that copy real failure classes, so a test framework can show it catches
+them ([`claims_agent/defects.py`](claims_agent/defects.py)). An unknown name is an error.
+
+| Defect | Where | What it does |
+|---|---|---|
+| `silent_write` | tool server | `get_claim` (a read) also writes a claim note |
+| `phantom_note` | tool server | `add_note` reports success but saves nothing |
+| `pay_on_settlement` | scripted model | the settlement procedure also pays the claim |
+| `loop` | scripted model | the agent keeps re-reading the claim and never finishes |
+| `vague_letter` | scripted model | acknowledgement letters leave out the claim and the document |
+| `trace_omits_read` | agent | the agent's own account leaves out its `get_claim` calls (the spans don't) |
 
 ## Develop and test
 
@@ -52,5 +76,5 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest -q --cov
 ```
 
-The 30 offline tests run at 98.7% coverage, with a 95% gate. They drive the real MCP tool server, in-process
+The 38 offline tests run at 99.2% coverage, with a 95% gate. They drive the real MCP tool server, in-process
 and over HTTP, with the rule-based policy. The procedures above have also been verified live with Azure OpenAI.

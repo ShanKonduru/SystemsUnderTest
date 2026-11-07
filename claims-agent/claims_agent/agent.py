@@ -23,6 +23,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from claims_agent.config import Settings
+from claims_agent.telemetry import EpisodeSpans, export
 
 Route = Literal["claims_intake", "claims_settlement", "claims_payment", "unsupported"]
 
@@ -171,6 +172,7 @@ class ClaimsAgent:
             llm={"provider": str(getattr(self.llm, "provider", "?")), "model": str(getattr(self.llm, "model", "?"))},
         )
         event_text = json.dumps(event, sort_keys=True)
+        spans = EpisodeSpans(principal)
         try:
             triage = await self.llm.structured(
                 system=TRIAGE_SYSTEM, user=f"Event:\n{event_text}", schema=Triage, effort="low"
@@ -180,16 +182,21 @@ class ClaimsAgent:
                 ep.output, ep.done = f"No action taken: {triage.reason}", True
                 return ep
             async with self.connect(principal) as tools:
-                await self._work(ep, tools, event_text, triage.route)
+                await self._work(ep, tools, event_text, triage.route, spans)
         except Exception as exc:
             while isinstance(exc, BaseExceptionGroup) and exc.exceptions:  # name the real cause, not the group
                 exc = exc.exceptions[0]
             ep.outcome, ep.error, ep.done = "error", f"{type(exc).__name__}: {exc}", False
         finally:
             ep.ended = time.time()
+            s = self.settings
+            if s.otel_file or s.otel_endpoint:
+                export(spans.request(ep.route, ep.outcome), s.otel_file, s.otel_endpoint, s.otel_token)
         return ep
 
-    async def _work(self, ep: EpisodeResult, tools: ToolSession, event_text: str, route: str) -> None:
+    async def _work(
+        self, ep: EpisodeResult, tools: ToolSession, event_text: str, route: str, spans: EpisodeSpans
+    ) -> None:
         specs = await tools.list_tools()
         messages: list[dict[str, Any]] = [
             {
@@ -215,20 +222,22 @@ class ClaimsAgent:
                 return
             results = []
             for b in uses:
+                start_ns = time.time_ns()
                 call = await tools.call(b.name, dict(b.input))
+                spans.tool(b.name, b.id, dict(b.input), call.ok, call.result, start_ns)
                 meta = getattr(tools, "meta", {}).get(b.name, {})
-                ep.steps.append(
-                    {
-                        "kind": "action",
-                        "name": b.name,
-                        "args": dict(b.input),
-                        "ok": call.ok,
-                        "result": call.result[:2000],
-                        "read_only": meta.get("kind") == "read",
-                        "access_denied": call.access_denied,
-                        "id": b.id,
-                    }
-                )
+                step = {
+                    "kind": "action",
+                    "name": b.name,
+                    "args": dict(b.input),
+                    "ok": call.ok,
+                    "result": call.result[:2000],
+                    "read_only": meta.get("kind") == "read",
+                    "access_denied": call.access_denied,
+                    "id": b.id,
+                }
+                if not ("trace_omits_read" in self.settings.defects and b.name == "get_claim"):  # planted defect
+                    ep.steps.append(step)
                 results.append(
                     {"type": "tool_result", "tool_use_id": b.id, "content": call.result, "is_error": not call.ok}
                 )
@@ -246,7 +255,9 @@ def inprocess_connector(settings: Settings) -> Connect:
         from claims_agent.backend import ClaimsBackend
         from claims_agent.tools_server import build_server
 
-        server = build_server(ClaimsBackend(settings.db_path, settings.letters_dir, principal, settings.today))
+        server = build_server(
+            ClaimsBackend(settings.db_path, settings.letters_dir, principal, settings.today, settings.defects)
+        )
         async with Client(server) as client:
             yield McpToolSession(client)
 

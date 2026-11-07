@@ -34,7 +34,7 @@ class AnthropicLLM:
         if client is None:
             try:
                 import anthropic
-            except ImportError as exc:  # pragma: no cover - depends on installed extras
+            except ImportError as exc:  # the provider's package is an optional extra
                 raise ImportError("provider ANTHROPIC needs: pip install 'harbor-llm[anthropic]'") from exc
             limits: dict[str, Any] = {"timeout": timeout, "max_retries": max_retries}
             client = (

@@ -25,6 +25,7 @@ services:
     environment:
       CLAIMS_TODAY: ${CLAIMS_TODAY:-2026-11-03}
       CLAIMS_TOOLS_TOKEN: ${CLAIMS_TOOLS_TOKEN:-}
+      CLAIMS_DEFECTS: ${CLAIMS_DEFECTS:-}        # test runs only: a "buggy build" (see claims_agent/defects.py)
     ports:
       - "127.0.0.1:${CLAIMS_TOOLS_PORT:-9100}:9100"
     healthcheck:
@@ -43,6 +44,11 @@ services:
       CLAIMS_TOOLS_TOKEN: ${CLAIMS_TOOLS_TOKEN:-}
       CLAIMS_SANDBOX_TOKEN: ${CLAIMS_SANDBOX_TOKEN:-}
       CLAIMS_MAX_STEPS: ${CLAIMS_MAX_STEPS:-10}
+      CLAIMS_DEFECTS: ${CLAIMS_DEFECTS:-}
+      # OpenTelemetry GenAI spans (OTLP/JSON), readable from the host in data/otel/
+      CLAIMS_OTEL_FILE: ${CLAIMS_OTEL_FILE:-/app/data/otel/spans.jsonl}
+      CLAIMS_OTEL_ENDPOINT: ${CLAIMS_OTEL_ENDPOINT:-}
+      CLAIMS_OTEL_TOKEN: ${CLAIMS_OTEL_TOKEN:-}
     ports:
       - "127.0.0.1:${CLAIMS_PORT:-8100}:8100"
     depends_on:

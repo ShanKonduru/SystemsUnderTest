@@ -268,3 +268,27 @@ def test_every_real_client_gets_a_bounded_timeout_and_retries() -> None:
 def test_invalid_limits_are_rejected(bad: dict[str, str]) -> None:
     with pytest.raises(ConfigError, match="LLM_TIMEOUT"):
         make_llm(env={**bad, "DEFAULT_LLM_PROVIDER": "OLLAMA"})
+
+
+@pytest.mark.parametrize(
+    ("blocked", "env", "extra"),
+    [
+        ("openai", {"DEFAULT_LLM_PROVIDER": "OPENAI", "OPENAI_API_KEY": "k"}, "openai"),
+        (
+            "openai",
+            {"DEFAULT_LLM_PROVIDER": "AZURE", "AZURE_API_KEY": "k", "AZURE_DEPLOYMENT": "d", "AZURE_ENDPOINT": "https://x/"},
+            "openai",
+        ),
+        ("anthropic", {"DEFAULT_LLM_PROVIDER": "ANTHROPIC", "ANTHROPIC_API_KEY": "k"}, "anthropic"),
+        ("boto3", {"DEFAULT_LLM_PROVIDER": "BEDROCK", "BEDROCK_MODEL_ID": "m", "AWS_REGION": "us-east-1"}, "bedrock"),
+        ("google.genai", {"DEFAULT_LLM_PROVIDER": "GEMINI", "GOOGLE_API_KEY": "k"}, "gemini"),
+    ],
+)
+def test_a_missing_provider_package_names_the_extra_to_install(
+    blocked: str, env: dict[str, str], extra: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    monkeypatch.setitem(sys.modules, blocked, None)  # importing it now raises ImportError, as if not installed
+    with pytest.raises(ImportError, match=rf"pip install 'harbor-llm\[{extra}\]'"):
+        make_llm(env=env)

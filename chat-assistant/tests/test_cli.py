@@ -181,3 +181,12 @@ def test_module_runs_as_a_script(monkeypatch, tmp_path, capsys, fake_session):
         warnings.simplefilter("ignore", RuntimeWarning)  # the module is already imported by this test file
         runpy.run_module("insurance_copilot.cli", run_name="__main__")
     assert "signed in as CUST-003" in capsys.readouterr().out
+
+
+def test_settings_load_without_python_dotenv(monkeypatch):
+    """python-dotenv is optional at import time: without it the real environment is used."""
+    from insurance_copilot import config
+
+    monkeypatch.setitem(sys.modules, "dotenv", None)  # importing it now raises ImportError
+    namespace = runpy.run_path(config.__file__, run_name="config_without_dotenv")
+    assert namespace["PROJECT_ROOT"] == config.PROJECT_ROOT

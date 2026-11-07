@@ -103,7 +103,7 @@ class BedrockLLM:
         if client is None:
             try:
                 import boto3
-            except ImportError as exc:  # pragma: no cover - depends on installed extras
+            except ImportError as exc:  # the provider's package is an optional extra
                 raise ImportError("provider BEDROCK needs: pip install 'harbor-llm[bedrock]'") from exc
             from botocore.config import Config
 

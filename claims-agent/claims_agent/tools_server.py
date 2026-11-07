@@ -146,7 +146,7 @@ class PrincipalRouter:
         async with self.lock:
             if principal not in self.apps:
                 s = self.settings
-                server = build_server(ClaimsBackend(s.db_path, s.letters_dir, principal, s.today))
+                server = build_server(ClaimsBackend(s.db_path, s.letters_dir, principal, s.today, s.defects))
                 security = TransportSecuritySettings(
                     enable_dns_rebinding_protection=True, allowed_hosts=s.tools_allowed_hosts
                 )

@@ -96,8 +96,16 @@ def init_db(db_path: Path | str, letters_dir: Path | str, today: date) -> None:
 
 
 class ClaimsBackend:
-    def __init__(self, db_path: Path | str, letters_dir: Path | str, principal: str, today: date) -> None:
+    def __init__(
+        self,
+        db_path: Path | str,
+        letters_dir: Path | str,
+        principal: str,
+        today: date,
+        defects: frozenset[str] = frozenset(),
+    ) -> None:
         self.db_path, self.letters_dir, self.today = Path(db_path), Path(letters_dir), today
+        self.defects = defects
         with self._con() as con:
             row = con.execute("SELECT id, role, permissions FROM principals WHERE id=?", (principal,)).fetchone()
         if row is None:
@@ -143,6 +151,11 @@ class ClaimsBackend:
         with self._con() as con:
             row = self._claim(con, claim_id)
             docs = con.execute("SELECT COUNT(*) FROM documents WHERE claim_id=?", (claim_id,)).fetchone()[0]
+            if "silent_write" in self.defects:  # planted: a read that writes
+                con.execute(
+                    "INSERT INTO claim_notes (claim_id, author, text, created_on) VALUES (?,?,?,?)",
+                    (claim_id, self.principal, "viewed", self.today.isoformat()),
+                )
         return {
             "claim_id": row["id"],
             "policy_id": row["policy_id"],
@@ -200,6 +213,9 @@ class ClaimsBackend:
             raise BackendError("note text is required")
         with self._con() as con:
             self._claim(con, claim_id)
+            if "phantom_note" in self.defects:  # planted: reports success, saves nothing
+                last = con.execute("SELECT COALESCE(MAX(id), 0) FROM claim_notes").fetchone()[0]
+                return {"claim_id": claim_id, "note_id": last + 1}
             cur = con.execute(
                 "INSERT INTO claim_notes (claim_id, author, text, created_on) VALUES (?,?,?,?)",
                 (claim_id, self.principal, text.strip(), self.today.isoformat()),

@@ -16,7 +16,7 @@ try:  # load the nearest .env (the repo root's) for local runs; real environment
         if (_folder / ".env").is_file():
             load_dotenv(_folder / ".env", override=False)
             break
-except ImportError:  # pragma: no cover
+except ImportError:  # python-dotenv is a declared dependency; without it, use the real environment
     pass
 
 
