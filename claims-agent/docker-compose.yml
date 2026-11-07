@@ -45,6 +45,7 @@ services:
       CLAIMS_SANDBOX_TOKEN: ${CLAIMS_SANDBOX_TOKEN:-}
       CLAIMS_MAX_STEPS: ${CLAIMS_MAX_STEPS:-10}
       CLAIMS_DEFECTS: ${CLAIMS_DEFECTS:-}
+      CLAIMS_ENGINE: ${CLAIMS_ENGINE:-loop}   # loop | langgraph: two builds of the same agent (parity, SE-06)
       # OpenTelemetry GenAI spans (OTLP/JSON), readable from the host in data/otel/
       CLAIMS_OTEL_FILE: ${CLAIMS_OTEL_FILE:-/app/data/otel/spans.jsonl}
       CLAIMS_OTEL_ENDPOINT: ${CLAIMS_OTEL_ENDPOINT:-}

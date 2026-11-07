@@ -144,3 +144,30 @@ async def test_an_empty_or_unreadable_claim_changes_nothing():
         msgs = [first, {"role": "assistant", "content": [use]}, {"role": "user", "content": [result]}]
         reply = await llm.create(messages=msgs)
         assert reply.stop_reason == "end_turn" and "empty or unreadable" in reply.content[0].text
+
+
+async def test_the_langgraph_build_behaves_like_the_plain_loop(settings, tmp_path):
+    """Same procedures, same tools, same model turns: only the orchestration differs (CLAIMS_ENGINE)."""
+    import shutil
+
+    from claims_agent.backend import init_db
+
+    events = [
+        {"type": "claim.document_received", "claim_id": "CLM-5003", "document_id": "DOC-78"},
+        {"type": "claim.assessment_completed", "claim_id": "CLM-5004", "decision": "approve", "amount": 1500},
+        {"type": "claim.payment_due", "claim_id": "CLM-5001"},
+        {"type": "policy.renewed"},
+    ]
+    accounts = {}
+    for engine in ("loop", "langgraph"):
+        settings.engine = engine
+        init_db(settings.db_path, settings.letters_dir, settings.today)
+        shutil.rmtree(tmp_path / "otel", ignore_errors=True)
+        accounts[engine] = []
+        for e in events:
+            ep = await run(settings, e)
+            accounts[engine].append([(s["name"], s["args"], s["ok"]) for s in ep.steps] + [ep.output, ep.done])
+    assert accounts["loop"] == accounts["langgraph"]
+    settings.max_steps = 2
+    stuck = await run(settings, events[0], llm=LoopingLLM())
+    assert stuck.outcome == "max_steps" and len(stuck.steps) == 2 and not stuck.done

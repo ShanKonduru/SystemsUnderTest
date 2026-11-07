@@ -49,6 +49,9 @@ class Settings:
     )
     sandbox_token: str = field(default_factory=lambda: os.environ.get("CLAIMS_SANDBOX_TOKEN", ""))
     max_steps: int = field(default_factory=lambda: int(os.environ.get("CLAIMS_MAX_STEPS", "10")))
+    # how the tool loop is orchestrated: "loop" (plain Python) or "langgraph" (a LangGraph graph): two builds of
+    # the same agent, for parity testing
+    engine: str = field(default_factory=lambda: os.environ.get("CLAIMS_ENGINE", "loop").strip().lower() or "loop")
     # OpenTelemetry GenAI spans (OTLP/JSON): a file to append to and/or an OTLP/HTTP endpoint (.../v1/traces)
     otel_file: str = field(default_factory=lambda: os.environ.get("CLAIMS_OTEL_FILE", ""))
     otel_endpoint: str = field(default_factory=lambda: os.environ.get("CLAIMS_OTEL_ENDPOINT", ""))

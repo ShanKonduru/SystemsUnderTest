@@ -50,7 +50,11 @@ def test_old_episodes_are_evicted(client, monkeypatch):
 
 
 def test_health_reports_the_llm(client):
-    assert client.get("/healthz").json() == {"status": "ok", "llm": {"provider": "SCRIPTED", "model": "claims-rules"}}
+    assert client.get("/healthz").json() == {
+        "status": "ok",
+        "llm": {"provider": "SCRIPTED", "model": "claims-rules"},
+        "engine": "loop",
+    }
 
 
 def test_health_survives_a_misconfigured_llm_and_builds_one_lazily(settings, monkeypatch):

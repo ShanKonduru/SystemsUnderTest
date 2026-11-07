@@ -45,6 +45,7 @@ git ignores, so you can inspect them from the host.
 | `CLAIMS_OTEL_FILE` | `/app/data/otel/spans.jsonl` in Docker | Append the OpenTelemetry GenAI spans of each episode (OTLP/JSON); `data/otel/` on the host |
 | `CLAIMS_OTEL_ENDPOINT`, `CLAIMS_OTEL_TOKEN` | (empty) | Also post the spans to an OTLP/HTTP receiver (e.g. `ta otel`), with a bearer token |
 | `CLAIMS_DEFECTS` | (empty) | **Test runs only.** A "buggy build": comma-separated planted defects (below) |
+| `CLAIMS_ENGINE` | `loop` | How the tool loop runs: `loop` (plain Python) or `langgraph` (a LangGraph graph). Two builds of the same agent, for parity testing (SE-06); `/healthz` reports it |
 
 ## Telemetry
 
@@ -76,5 +77,5 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest -q --cov
 ```
 
-The 38 offline tests run at 99.2% coverage, with a 95% gate. They drive the real MCP tool server, in-process
+The 39 offline tests run at 99.2% coverage, with a 95% gate; one checks that both engines give the same account of every procedure. They drive the real MCP tool server, in-process
 and over HTTP, with the rule-based policy. The procedures above have also been verified live with Azure OpenAI.

@@ -207,42 +207,57 @@ class ClaimsAgent:
                 ),
             }
         ]
+        if self.settings.engine == "langgraph":
+            from claims_agent.graph import run_graph
+
+            await run_graph(self, ep, tools, specs, messages, spans)
+            return
         for _ in range(self.settings.max_steps):
-            resp = await self.llm.create(
-                system=AGENT_SYSTEM, tools=specs, messages=messages, max_tokens=4000, output_config={"effort": "medium"}
-            )
-            tin, tout = _usage(resp)
-            ep.usage["input_tokens"] += tin
-            ep.usage["output_tokens"] += tout
-            messages.append({"role": "assistant", "content": resp.content})
-            uses = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
+            uses = await self.model_turn(ep, specs, messages)
             if not uses:
-                ep.output = "\n".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
-                ep.done = resp.stop_reason != "max_tokens"
                 return
-            results = []
-            for b in uses:
-                start_ns = time.time_ns()
-                call = await tools.call(b.name, dict(b.input))
-                spans.tool(b.name, b.id, dict(b.input), call.ok, call.result, start_ns)
-                meta = getattr(tools, "meta", {}).get(b.name, {})
-                step = {
-                    "kind": "action",
-                    "name": b.name,
-                    "args": dict(b.input),
-                    "ok": call.ok,
-                    "result": call.result[:2000],
-                    "read_only": meta.get("kind") == "read",
-                    "access_denied": call.access_denied,
-                    "id": b.id,
-                }
-                if not ("trace_omits_read" in self.settings.defects and b.name == "get_claim"):  # planted defect
-                    ep.steps.append(step)
-                results.append(
-                    {"type": "tool_result", "tool_use_id": b.id, "content": call.result, "is_error": not call.ok}
-                )
-            messages.append({"role": "user", "content": results})
+            messages.append({"role": "user", "content": await self.run_tools(ep, tools, uses, spans)})
         ep.outcome, ep.done = "max_steps", False
+
+    async def model_turn(self, ep: EpisodeResult, specs: list[dict[str, Any]], messages: list[dict[str, Any]]) -> list[Any]:
+        """One model call. Returns the tool uses it asked for; none means it finished (the output is recorded)."""
+        resp = await self.llm.create(
+            system=AGENT_SYSTEM, tools=specs, messages=messages, max_tokens=4000, output_config={"effort": "medium"}
+        )
+        tin, tout = _usage(resp)
+        ep.usage["input_tokens"] += tin
+        ep.usage["output_tokens"] += tout
+        messages.append({"role": "assistant", "content": resp.content})
+        uses = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
+        if not uses:
+            ep.output = "\n".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+            ep.done = resp.stop_reason != "max_tokens"
+        return uses
+
+    async def run_tools(
+        self, ep: EpisodeResult, tools: ToolSession, uses: list[Any], spans: EpisodeSpans
+    ) -> list[dict[str, Any]]:
+        """Call each requested tool as the principal; record the step and the span; return the tool results."""
+        results = []
+        for b in uses:
+            start_ns = time.time_ns()
+            call = await tools.call(b.name, dict(b.input))
+            spans.tool(b.name, b.id, dict(b.input), call.ok, call.result, start_ns)
+            meta = getattr(tools, "meta", {}).get(b.name, {})
+            step = {
+                "kind": "action",
+                "name": b.name,
+                "args": dict(b.input),
+                "ok": call.ok,
+                "result": call.result[:2000],
+                "read_only": meta.get("kind") == "read",
+                "access_denied": call.access_denied,
+                "id": b.id,
+            }
+            if not ("trace_omits_read" in self.settings.defects and b.name == "get_claim"):  # planted defect
+                ep.steps.append(step)
+            results.append({"type": "tool_result", "tool_use_id": b.id, "content": call.result, "is_error": not call.ok})
+        return results
 
 
 def inprocess_connector(settings: Settings) -> Connect:

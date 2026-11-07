@@ -61,7 +61,7 @@ def create_app(settings: Settings | None = None, llm: Any = None, connect: Conne
             identity = _llm_identity(get_llm())
         except Exception as exc:  # a misconfigured .env must not break liveness
             identity = {"provider": "unconfigured", "model": str(exc)[:200]}
-        return {"status": "ok", "llm": identity}
+        return {"status": "ok", "llm": identity, "engine": settings.engine}
 
     @app.post("/events")
     async def post_event(body: EventBody, x_principal: str = Header(default="")) -> dict[str, Any]:
