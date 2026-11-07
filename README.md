@@ -6,8 +6,8 @@ customer or company data is used anywhere. Each app has its own `docker-compose.
 | App | Folder | What it is | Status |
 |---|---|---|---|
 | LLM factory | [`common/harbor_llm`](common/harbor_llm) | One interface over every LLM provider, chosen by `DEFAULT_LLM_PROVIDER` | ready |
-| Chat assistant | `chat-assistant/` | Customer chat: web UI, MCP tool server, SQLite system of record | in progress |
-| Claims task agent | `claims-agent/` | Event-driven back-office agent (no chat): MCP tools, SQLite, letters folder | planned |
+| Chat assistant | [`chat-assistant/`](chat-assistant) | Customer chat: web UI, MCP tool server, SQLite system of record | running (tests being raised to 95%) |
+| Claims task agent | [`claims-agent/`](claims-agent) | Event-driven back-office agent (no chat): MCP tools over HTTP, SQLite, letters folder | ready (98.7% coverage, verified live) |
 | Multi-agent desk | `multi-agent-desk/` | Triage agent handing off to billing and claims agents, identity carried along | planned |
 
 ## Configure the LLM once
