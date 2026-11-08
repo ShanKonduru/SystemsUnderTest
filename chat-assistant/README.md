@@ -24,6 +24,18 @@ docker compose -f SUT\chat-assistant\docker-compose.yml down        :: add -v to
 The port is bound to `127.0.0.1` only. The database is `SUT/chat-assistant/data/insurance.db` (a bind mount,
 git-ignored), created and seeded on first start; TruAssure reads it read-only to diff state.
 
+## Run it observed (what TruAssure's pilot 0 uses)
+
+```bat
+docker compose -f SUT\chat-assistant\docker-compose.yml -f SUT\chat-assistant\docker-compose.observed.yml up -d --build
+```
+
+The assistant's MCP tools then run as their own service (`chat-tools`, MCP over HTTP) behind TruAssure's recording
+proxy (`chat-proxy`, control API on 127.0.0.1:9450). Every tool call is logged to `data/proxy-logs/` with the customer
+from the `X-Customer-Id` header, and faults can be injected with `TA_PROXY_TOKEN`. The tools server accepts the Host
+names in `COPILOT_MCP_ALLOWED_HOSTS` (default `localhost:*,127.0.0.1:*,chat-tools:*`). `scripts\truassure-ops.bat
+deploy chat` deploys it this way.
+
 ## Develop and test locally
 
 ```bat

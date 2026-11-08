@@ -4,7 +4,9 @@
 
 The app connects to http://host:port/mcp and names the signed-in customer in the X-Customer-Id header of every
 request; each customer gets their own tool server instance (bound to that customer, exactly as over stdio).
-COPILOT_DB and COPILOT_TODAY come from the environment.
+COPILOT_DB and COPILOT_TODAY come from the environment. COPILOT_MCP_ALLOWED_HOSTS (comma-separated, default
+"localhost:*,127.0.0.1:*,chat-tools:*") lists the Host headers the server accepts (DNS-rebinding protection), so a
+recording proxy in another container can reach it as chat-tools:9000.
 
 Sandbox/demo only: the server trusts the X-Customer-Id header, so it must only be reachable by the app (it binds to
 127.0.0.1 by default). A production deployment would authenticate the app and derive the customer from a verified
@@ -24,6 +26,11 @@ from insurance_copilot.backend.db import BackendError, InsuranceBackend
 from insurance_copilot.mcp_server.server import build_server
 
 CUSTOMER_HEADER = b"x-customer-id"
+
+
+def allowed_hosts() -> list[str]:
+    raw = os.environ.get("COPILOT_MCP_ALLOWED_HOSTS", "localhost:*,127.0.0.1:*,chat-tools:*")
+    return [h.strip() for h in raw.split(",") if h.strip()]
 
 
 class CustomerRouter:
@@ -59,7 +66,10 @@ class CustomerRouter:
         async with self.lock:
             if customer not in self.apps:
                 server = build_server(InsuranceBackend(self.db_path, customer, self.today))
-                app = server.streamable_http_app()
+                from mcp.server.transport_security import TransportSecuritySettings
+
+                security = TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=allowed_hosts())
+                app = server.streamable_http_app(transport_security=security)
                 ready = anyio.Event()
 
                 async def own_sessions() -> None:   # the session manager's task group lives as long as the server
