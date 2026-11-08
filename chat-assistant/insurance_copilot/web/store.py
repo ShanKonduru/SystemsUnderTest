@@ -46,7 +46,6 @@ CREATE INDEX IF NOT EXISTS idx_msg_conv ON chat_messages(conversation_id, id);
 DEMO_USERS = [("shan", "Shan", "CUST-001"), ("indu", "Indu", "CUST-002"), ("sri", "Sri", "CUST-003"),
               # Harbor Mutual representatives (backend table representatives): service rep, licensed agent, supervisor
               ("rivera", "J. Rivera", "REP-201"), ("chen", "A. Chen", "REP-202"), ("patel", "M. Patel", "REP-203")]
-DEFAULT_DEMO_PASSWORD = "P@$$w0rd123"
 SESSION_HOURS = 12
 PBKDF2_ITERATIONS = 200_000
 
@@ -81,7 +80,9 @@ class AppStore:
 
     # ------------------------------------------------------------------ setup
     def ensure_schema(self, demo_password: str | None = None) -> None:
-        password = demo_password or os.environ.get("DEMO_USER_PASSWORD") or DEFAULT_DEMO_PASSWORD
+        password = demo_password or os.environ.get("DEMO_USER_PASSWORD")
+        if not password:  # no password in the code: the demo users' password comes from the environment (.env)
+            raise RuntimeError("set DEMO_USER_PASSWORD (the demo users' password) in the repository's root .env")
         with self._conn() as con:
             con.executescript(APP_SCHEMA)
             for username, display, customer in DEMO_USERS:

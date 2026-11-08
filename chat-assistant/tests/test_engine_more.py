@@ -13,8 +13,13 @@ from tests.fakes import FakeMessage, ScriptedLLM, TextBlock, text, tools
 
 
 async def _send(settings, llm, message, customer="CUST-001", events=None):
-    async with open_session(customer_id=customer, confirm=lambda req: True, settings=settings, llm=llm,
-                            on_event=(events.append if events is not None else None)) as session:
+    async with open_session(
+        customer_id=customer,
+        confirm=lambda req: True,
+        settings=settings,
+        llm=llm,
+        on_event=(events.append if events is not None else None),
+    ) as session:
         return await session.send(message), session
 
 
@@ -44,8 +49,11 @@ class PlannerFails(ScriptedLLM):
         return await super().structured(system=system, user=user, schema=schema, effort=effort)
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: engine._plan returns None on StructuredOutputError, but _run_turn then calls "
-                                       "trace.plan.model_dump() on None, so the whole turn fails instead of continuing")
+@pytest.mark.xfail(
+    strict=True,
+    reason="BUG: engine._plan returns None on StructuredOutputError, but _run_turn then calls "
+    "trace.plan.model_dump() on None, so the whole turn fails instead of continuing",
+)
 async def test_planner_failure_still_lets_the_executor_answer(settings):
     llm = PlannerFails(structured=[intent("billing")], executor=[text("Your balance is $193.60.")])
     events = []
@@ -68,8 +76,10 @@ async def test_cut_off_answer_without_text(settings):
 
 
 async def test_unknown_tool_is_blocked_and_reported_to_the_model(settings):
-    llm = ScriptedLLM(structured=[intent("billing"), plan("respond")],
-                      executor=[tools(("transfer_funds", {"amount": 5})), text("I can't do that.")])
+    llm = ScriptedLLM(
+        structured=[intent("billing"), plan("respond")],
+        executor=[tools(("transfer_funds", {"amount": 5})), text("I can't do that.")],
+    )
     trace, _ = await _send(settings, llm, "move money")
     call = trace.tool_calls[0]
     assert call.blocked_reason == "UNKNOWN_TOOL" and call.is_error and not call.executed
@@ -78,8 +88,9 @@ async def test_unknown_tool_is_blocked_and_reported_to_the_model(settings):
 
 
 async def test_unhandled_intents_without_an_intent(settings):
-    async with open_session(customer_id="CUST-001", confirm=lambda r: True, settings=settings,
-                            llm=ScriptedLLM()) as session:
+    async with open_session(
+        customer_id="CUST-001", confirm=lambda r: True, settings=settings, llm=ScriptedLLM()
+    ) as session:
         assert session._unhandled_intents(TurnTrace(turn=1, customer_id="CUST-001", user_message="hi")) == []
 
 
@@ -101,11 +112,17 @@ class DataBlock:
 
 def test_jsonable_handles_every_block_kind():
     assert engine_mod._jsonable("plain") == "plain"
-    out = engine_mod._jsonable([{"type": "text", "text": "dict"}, SdkBlock(), DataBlock(), PydanticLike(), "raw",
-                                TextBlock("fake")])
-    assert out == [{"type": "text", "text": "dict"}, {"type": "text", "text": "sdk"},
-                   {"type": "text", "text": "dataclass"}, {"type": "text", "text": "pydantic"}, "raw",
-                   {"text": "fake", "type": "text"}]
+    out = engine_mod._jsonable(
+        [{"type": "text", "text": "dict"}, SdkBlock(), DataBlock(), PydanticLike(), "raw", TextBlock("fake")]
+    )
+    assert out == [
+        {"type": "text", "text": "dict"},
+        {"type": "text", "text": "sdk"},
+        {"type": "text", "text": "dataclass"},
+        {"type": "text", "text": "pydantic"},
+        "raw",
+        {"text": "fake", "type": "text"},
+    ]
 
 
 def test_passed_reads_only_a_verified_true_result():

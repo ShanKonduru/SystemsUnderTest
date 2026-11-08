@@ -23,8 +23,11 @@ def test_http_tool_server_serves_each_customer_from_its_header_and_the_app_conne
     s.close()
     db = tmp_path / "s.db"
     init_db(db, date(2026, 11, 3))
-    server = uvicorn.Server(uvicorn.Config(CustomerRouter(db, date(2026, 11, 3)), host="127.0.0.1", port=port,
-                                           log_level="warning", lifespan="on"))
+    server = uvicorn.Server(
+        uvicorn.Config(
+            CustomerRouter(db, date(2026, 11, 3)), host="127.0.0.1", port=port, log_level="warning", lifespan="on"
+        )
+    )
     threading.Thread(target=server.run, daemon=True).start()
     while not server.started:
         time.sleep(0.05)

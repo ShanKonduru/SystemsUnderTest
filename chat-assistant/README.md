@@ -9,7 +9,7 @@ Actions that change data, such as payments or policy changes, ask the customer f
 ```bat
 :: from the repo root; LLM settings come from the root .env (see ..\..\.env.example)
 docker compose -f SUT\chat-assistant\docker-compose.yml up -d --build
-:: open http://127.0.0.1:8000  -  demo customers: shan, indu, sri (password P@$$w0rd123, demo data only)
+:: open http://127.0.0.1:8000  -  demo customers: shan, indu, sri (password: DEMO_USER_PASSWORD in the root .env)
 docker compose -f SUT\chat-assistant\docker-compose.yml logs -f
 docker compose -f SUT\chat-assistant\docker-compose.yml down        :: add -v to also delete the database volume
 ```

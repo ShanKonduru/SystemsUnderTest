@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from insurance_copilot.config import Settings
 from insurance_copilot.core.trace import Entity, IntentResult, Plan, PlanStep
 
 TODAY = date(2026, 11, 3)
+# the demo users' password for tests (the app reads it when it is imported; a real one lives in .env)
+os.environ.setdefault("DEMO_USER_PASSWORD", "test-demo-password")
 
 
 @pytest.fixture
@@ -28,9 +31,12 @@ def settings(db: Path) -> Settings:
 
 def intent(*names: str, clarify: str = "", **entities: str) -> IntentResult:
     return IntentResult(
-        primary_intent=names[0], intents=list(names),
+        primary_intent=names[0],
+        intents=list(names),
         entities=[Entity(name=k, value=v) for k, v in entities.items()],
-        needs_clarification=bool(clarify), clarification_question=clarify, confidence="high",
+        needs_clarification=bool(clarify),
+        clarification_question=clarify,
+        confidence="high",
     )
 
 
