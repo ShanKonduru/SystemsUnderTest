@@ -11,17 +11,8 @@ import pytest
 
 from insurance_copilot.backend import db as db_mod
 from insurance_copilot.backend.db import (
-    AccessDenied,
-    CustomerNotVerified,
-    InsuranceBackend,
-    InvalidRequest,
-    NotFound,
-    NotPermitted,
-    _item_factor,
-    _reference,
-    _strip_new_ids,
-    driver_surcharge,
-    init_db,
+    AccessDenied, CustomerNotVerified, InsuranceBackend, InvalidRequest, NotFound, NotPermitted,
+    _item_factor, _reference, _strip_new_ids, driver_surcharge, init_db,
 )
 from insurance_copilot.backend.policy import TransactionPolicy
 from insurance_copilot.backend.review import main as review_main
@@ -29,12 +20,8 @@ from insurance_copilot.core.attachments import compose_user_message
 from tests.conftest import TODAY
 
 GUEST = "GUEST-0B2C3D4E"
-APPLICANT = {
-    "full_name": "Lena Park",
-    "email": "lena.park@example.com",
-    "date_of_birth": "1991-03-08",
-    "address": "12 Elm St, Springfield, IL 62704",
-}
+APPLICANT = {"full_name": "Lena Park", "email": "lena.park@example.com", "date_of_birth": "1991-03-08",
+             "address": "12 Elm St, Springfield, IL 62704"}
 PDF = b"%PDF-1.4\n% proof\n%%EOF\n"
 SHAN = ("CUST-001", "1985-04-12", "62701")
 
@@ -52,12 +39,8 @@ def queued(tmp_path):
 
 
 def _renters_quote(be):
-    return be.create_quote(
-        "RENTERS",
-        "standard",
-        500,
-        {"property_address": "12 Elm St, Springfield, IL 62704", "personal_property_value": "15000"},
-    )["quote_id"]
+    return be.create_quote("RENTERS", "standard", 500, {"property_address": "12 Elm St, Springfield, IL 62704",
+                                                        "personal_property_value": "15000"})["quote_id"]
 
 
 def _rep(db, rep_id, customer=None):
@@ -78,16 +61,13 @@ def test_pricing_and_result_helpers():
     assert _reference("not a dict") is None and _reference({"other": 1}) is None
     assert _reference({"claim_id": "CLM-1"}) == "CLM-1"
     assert _strip_new_ids(["x"], {}) == ["x"]
-    assert _strip_new_ids(
-        {"payment_id": "PAY-1", "policy_id": "POL-1", "id": "x", "amount": 5}, {"policy_id": "POL-1"}
-    ) == {"policy_id": "POL-1", "amount": 5}
+    assert _strip_new_ids({"payment_id": "PAY-1", "policy_id": "POL-1", "id": "x", "amount": 5},
+                          {"policy_id": "POL-1"}) == {"policy_id": "POL-1", "amount": 5}
 
 
 def test_attachment_message_for_several_documents():
-    docs = [
-        {"document_id": f"DOC-600{i}", "filename": f"f{i}.pdf", "content_type": "application/pdf", "size_bytes": 10}
-        for i in (1, 2)
-    ]
+    docs = [{"document_id": f"DOC-600{i}", "filename": f"f{i}.pdf", "content_type": "application/pdf",
+             "size_bytes": 10} for i in (1, 2)]
     out = compose_user_message("  ", docs)
     assert out.startswith("Here are the documents.\n[Attached document DOC-6001")
     assert compose_user_message("", docs[:1]).startswith("Here is the document.")
@@ -113,9 +93,7 @@ def test_older_database_gets_missing_columns(db):
     con.commit()
     con.close()
     InsuranceBackend(db, "CUST-001", TODAY)
-    cols = {r[1] for r in _q(db, "PRAGMA table_info(handoffs)")} | {
-        r[1] for r in _q(db, "PRAGMA table_info(transactions)")
-    }
+    cols = {r[1] for r in _q(db, "PRAGMA table_info(handoffs)")} | {r[1] for r in _q(db, "PRAGMA table_info(transactions)")}
     assert {"resolution", "consent"} <= cols
 
 
@@ -158,8 +136,7 @@ def test_review_cli_list_show_and_errors(db, capsys):
     assert review_main(["--db", str(db), "list"]) == 0
     assert "No transactions." in capsys.readouterr().out
     InsuranceBackend(db, "CUST-001", TODAY).execute(
-        "make_payment", {"policy_id": "POL-1002", "amount": 5, "payment_method": "card_on_file"}
-    )
+        "make_payment", {"policy_id": "POL-1002", "amount": 5, "payment_method": "card_on_file"})
     assert review_main(["--db", str(db), "list", "--status", "all", "--customer", "CUST-001"]) == 0
     assert "TXN-10001" in capsys.readouterr().out
     assert review_main(["--db", str(db), "list", "--status", "all", "--customer", "CUST-002"]) == 0
@@ -216,7 +193,7 @@ def test_start_application_validation(db):
 
 def test_returning_applicant_matching_a_customer_is_flagged(db):
     guest = InsuranceBackend(db, GUEST, TODAY)
-    applicant = {**APPLICANT, "email": "sri@example.com"}  # CUST-003's email
+    applicant = {**APPLICANT, "email": "sri@example.com"}   # CUST-003's email
     first = guest.start_application(_renters_quote(guest), **applicant)
     con = sqlite3.connect(db)
     con.execute("UPDATE prospects SET match_status='new'")
@@ -352,9 +329,8 @@ def test_products_and_quote_validation(db):
     with pytest.raises(NotFound, match="Product BOAT"):
         be.create_quote("BOAT", "standard", 500, {})
     with pytest.raises(InvalidRequest, match="Invalid insured item"):
-        be.create_quote(
-            "HOME", "standard", 500, {"property_address": "1 Main St", "year_built": "1990", "square_feet": "big"}
-        )
+        be.create_quote("HOME", "standard", 500, {"property_address": "1 Main St", "year_built": "1990",
+                                                  "square_feet": "big"})
 
 
 def test_purchase_validation(db):

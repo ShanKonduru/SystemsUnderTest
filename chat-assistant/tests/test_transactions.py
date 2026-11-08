@@ -7,11 +7,7 @@ import pytest
 from mcp import Client
 
 from insurance_copilot.backend.db import (
-    AccessDenied,
-    DuplicateRequest,
-    InsuranceBackend,
-    InvalidRequest,
-    NotPermitted,
+    AccessDenied, DuplicateRequest, InsuranceBackend, InvalidRequest, NotPermitted,
 )
 from insurance_copilot.backend.policy import DISCLOSURES, POLICIES, TransactionPolicy
 from insurance_copilot.backend.review import main as review_main
@@ -45,38 +41,21 @@ def test_direct_commit_is_applied_and_recorded(db):
     assert out["request_tracking"] == {"transaction_id": "TXN-10001", "status": "committed"}
     assert _q(db, "SELECT balance_due FROM policies WHERE id='POL-1002'") == [(143.6,)]
     txn = be.get_transaction("TXN-10001")
-    assert (txn["status"], txn["level"], txn["reference"], txn["actor"]) == (
-        "committed",
-        "commit",
-        "PAY-9001",
-        "customer:CUST-001",
-    )
+    assert (txn["status"], txn["level"], txn["reference"], txn["actor"]) == ("committed", "commit", "PAY-9001",
+                                                                             "customer:CUST-001")
 
 
 def test_claim_is_submitted_not_committed(db):
-    out = InsuranceBackend(db, "CUST-001", TODAY).execute(
-        "file_claim",
-        {
-            "policy_id": "POL-1001",
-            "incident_date": "2026-11-02",
-            "claim_type": "collision",
-            "description": "bumper",
-            "estimated_amount": 1800.0,
-        },
-    )
+    out = InsuranceBackend(db, "CUST-001", TODAY).execute("file_claim", {
+        "policy_id": "POL-1001", "incident_date": "2026-11-02", "claim_type": "collision",
+        "description": "bumper", "estimated_amount": 1800.0})
     assert out["claim_id"] == "CLM-5003" and out["request_tracking"]["status"] == "submitted"
 
 
 def test_quotes_are_prepare_level_and_not_recorded(db):
-    out = InsuranceBackend(db, "CUST-003", TODAY).execute(
-        "get_quote",
-        {
-            "product_code": "RENTERS",
-            "coverage_level": "standard",
-            "deductible": 500,
-            "insured_item": {"property_address": "201 River St", "personal_property_value": "30000"},
-        },
-    )
+    out = InsuranceBackend(db, "CUST-003", TODAY).execute("get_quote", {
+        "product_code": "RENTERS", "coverage_level": "standard", "deductible": 500,
+        "insured_item": {"property_address": "201 River St", "personal_property_value": "30000"}})
     assert out["quote_id"] == "QTE-7001" and "request_tracking" not in out
     assert _q(db, "SELECT COUNT(*) FROM transactions") == [(0,)]
 
@@ -84,18 +63,14 @@ def test_quotes_are_prepare_level_and_not_recorded(db):
 def test_failed_validation_records_no_transaction(db):
     with pytest.raises(InvalidRequest):
         InsuranceBackend(db, "CUST-001", TODAY).execute(
-            "make_payment", {"policy_id": "POL-1001", "amount": 10.0, "payment_method": "card_on_file"}
-        )
+            "make_payment", {"policy_id": "POL-1001", "amount": 10.0, "payment_method": "card_on_file"})
     assert _q(db, "SELECT COUNT(*) FROM transactions") == [(0,)]
 
 
 # ---------------------------------------------------------------- review policy
 def test_review_policy_holds_cancellation_without_changing_anything(db):
     be = verified(InsuranceBackend(db, "CUST-001", TODAY, "review"))
-    out = be.execute(
-        "cancel_policy",
-        ok("cancel_policy", {"policy_id": "POL-1002", "reason": "sold the house", "effective_date": None}),
-    )
+    out = be.execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1002", "reason": "sold the house", "effective_date": None}))
     assert out["status"] == "pending_review" and out["applied"] is False
     assert out["preview"]["effective_date"] == TODAY.isoformat()
     assert _q(db, "SELECT status FROM policies WHERE id='POL-1002'") == [("active",)]
@@ -104,15 +79,9 @@ def test_review_policy_holds_cancellation_without_changing_anything(db):
 
 def test_review_preview_has_no_ids_that_do_not_exist_yet(db):
     be = InsuranceBackend(db, "CUST-003", TODAY, "review")
-    q = be.execute(
-        "get_quote",
-        {
-            "product_code": "RENTERS",
-            "coverage_level": "standard",
-            "deductible": 500,
-            "insured_item": {"property_address": "201 River St", "personal_property_value": "30000"},
-        },
-    )
+    q = be.execute("get_quote", {"product_code": "RENTERS", "coverage_level": "standard", "deductible": 500,
+                                 "insured_item": {"property_address": "201 River St",
+                                                  "personal_property_value": "30000"}})
     out = be.execute("purchase_policy", ok("purchase_policy", {"quote_id": q["quote_id"], "start_date": None}))
     assert out["status"] == "pending_review"
     assert "policy_id" not in out["preview"] and "id" not in out["preview"]
@@ -124,10 +93,8 @@ def test_review_preview_has_no_ids_that_do_not_exist_yet(db):
 def test_review_still_enforces_business_rules_up_front(db):
     be = verified(InsuranceBackend(db, "CUST-001", TODAY, "review"))
     with pytest.raises(InvalidRequest, match="at least 16"):
-        be.execute(
-            "add_driver",
-            {"policy_id": "POL-1001", "full_name": "Kid", "date_of_birth": "2012-01-01", "relationship": "child"},
-        )
+        be.execute("add_driver", {"policy_id": "POL-1001", "full_name": "Kid", "date_of_birth": "2012-01-01",
+                                  "relationship": "child"})
     assert _q(db, "SELECT COUNT(*) FROM transactions") == [(0,)]
 
 
@@ -148,9 +115,7 @@ def test_approve_applies_the_request(db):
 
 def test_reject_changes_nothing(db):
     be = verified(InsuranceBackend(db, "CUST-001", TODAY, "review"))
-    out = be.execute(
-        "cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None})
-    )
+    out = be.execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None}))
     done = be.review_transaction(out["transaction_id"], "reject", "J. Rivera", "needs a call")
     assert done["status"] == "rejected" and done["decision_note"] == "needs a call"
     assert _q(db, "SELECT status FROM policies WHERE id='POL-1001'") == [("active",)]
@@ -160,12 +125,8 @@ def test_reject_changes_nothing(db):
 
 def test_approve_fails_when_rules_changed_since(db):
     be = verified(InsuranceBackend(db, "CUST-001", TODAY, "review"))
-    first = be.execute(
-        "cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "a", "effective_date": None})
-    )
-    second = be.execute(
-        "cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "b", "effective_date": None})
-    )
+    first = be.execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "a", "effective_date": None}))
+    second = be.execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "b", "effective_date": None}))
     be.review_transaction(first["transaction_id"], "approve", "J. Rivera")
     out = be.review_transaction(second["transaction_id"], "approve", "J. Rivera")
     assert out["status"] == "failed" and "already cancelled" in out["decision_note"]
@@ -175,9 +136,7 @@ def test_not_permitted_below_submit(db, monkeypatch):
     monkeypatch.setitem(POLICIES, "locked", {"cancel_policy": "read"})
     be = InsuranceBackend(db, "CUST-001", TODAY, "locked")
     with pytest.raises(NotPermitted, match="representative"):
-        be.execute(
-            "cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None})
-        )
+        be.execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None}))
 
 
 def test_unknown_policy_is_rejected():
@@ -188,8 +147,7 @@ def test_unknown_policy_is_rejected():
 # ---------------------------------------------------------------- access and duplicates
 def test_transactions_are_customer_scoped(db):
     InsuranceBackend(db, "CUST-001", TODAY).execute(
-        "make_payment", {"policy_id": "POL-1002", "amount": 5.0, "payment_method": "card_on_file"}
-    )
+        "make_payment", {"policy_id": "POL-1002", "amount": 5.0, "payment_method": "card_on_file"})
     other = InsuranceBackend(db, "CUST-002", TODAY)
     with pytest.raises(AccessDenied):
         other.get_transaction("TXN-10001")
@@ -256,16 +214,13 @@ async def test_approval_prompt_carries_the_level(settings, db):
     settings.txn_policy = "review"
     llm = ScriptedLLM(
         structured=[intent("cancel_policy"), plan("cancel_policy", "respond")],
-        executor=[
-            tools(("verify_identity", {"date_of_birth": "1985-04-12", "postal_code": "62701"})),
-            tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold"})),
-            text("Your cancellation request TXN-10001 is waiting for review."),
-        ],
+        executor=[tools(("verify_identity", {"date_of_birth": "1985-04-12", "postal_code": "62701"})),
+                  tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold"})),
+                  text("Your cancellation request TXN-10001 is waiting for review.")],
     )
     asked = []
-    async with open_session(
-        customer_id="CUST-001", confirm=lambda r: asked.append(r) or True, settings=settings, llm=llm
-    ) as session:
+    async with open_session(customer_id="CUST-001", confirm=lambda r: asked.append(r) or True, settings=settings,
+                            llm=llm) as session:
         trace = await session.send("cancel my home policy")
     assert asked[0].level == "submit" and "review" in asked[0].effect
     assert trace.tool_calls[1].level == "submit" and trace.tool_calls[1].executed
@@ -275,9 +230,7 @@ async def test_approval_prompt_carries_the_level(settings, db):
 
 # ---------------------------------------------------------------- staff review command
 def test_review_cli(db, capsys):
-    verified(InsuranceBackend(db, "CUST-001", TODAY, "review")).execute(
-        "cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None})
-    )
+    verified(InsuranceBackend(db, "CUST-001", TODAY, "review")).execute("cancel_policy", ok("cancel_policy", {"policy_id": "POL-1001", "reason": "x", "effective_date": None}))
     assert review_main(["--db", str(db), "list"]) == 0
     assert "TXN-10001" in capsys.readouterr().out
     assert review_main(["--db", str(db), "approve", "TXN-10001", "--by", "J. Rivera"]) == 0

@@ -59,7 +59,8 @@ class FakeServer:
         self.reply, self.is_error, self.calls = reply, is_error, []
 
     async def list_tools(self):
-        return [FakeTool("get_billing", {"properties": {"policy_id": {"type": "string"}}}), FakeTool("brand_new_tool")]
+        return [FakeTool("get_billing", {"properties": {"policy_id": {"type": "string"}}}),
+                FakeTool("brand_new_tool")]
 
     async def call_tool(self, name, args):
         self.calls.append((name, args))
@@ -67,9 +68,8 @@ class FakeServer:
 
 
 def _client(api, principal="CUST-001"):
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=api.app()), base_url="http://api", headers={"X-Customer-Id": principal}
-    )
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=api.app()), base_url="http://api",
+                             headers={"X-Customer-Id": principal})
 
 
 def test_rest_api_edge_cases(db):
@@ -92,20 +92,15 @@ def test_rest_api_edge_cases(db):
             assert err.status_code == 400 and err.json() == {"error": "BUSINESS_RULE: no"}
             txt = await http.get("/v1/policies/POL-1002/billing", headers={"X-Customer-Id": "CUST-TXT"})
             assert txt.status_code == 200 and txt.text == "plain words, not JSON"
-            rpc_ok = await http.post(
-                "/v1/operations/brand_new_tool", json={"x": 1}, headers={"X-Customer-Id": "CUST-TXT"}
-            )
+            rpc_ok = await http.post("/v1/operations/brand_new_tool", json={"x": 1},
+                                     headers={"X-Customer-Id": "CUST-TXT"})
             assert rpc_ok.status_code == 201 and rpc_ok.headers["content-type"].startswith("text/plain")
         assert api.servers["CUST-TXT"].calls[0] == ("get_billing", {"policy_id": "POL-1002"})
-
     asyncio.run(run())
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: the RPC-style fallback (POST /v1/operations/{tool}) passes its own {tool} "
-    "URL segment to the tool as an extra 'tool' argument",
-)
+@pytest.mark.xfail(strict=True, reason="BUG: the RPC-style fallback (POST /v1/operations/{tool}) passes its own {tool} "
+                                       "URL segment to the tool as an extra 'tool' argument")
 def test_rpc_style_call_passes_only_the_body_as_arguments(db):
     async def run():
         api = InsuranceApi(db, TODAY)
@@ -114,7 +109,6 @@ def test_rpc_style_call_passes_only_the_body_as_arguments(db):
             r = await http.post("/v1/operations/brand_new_tool", json={"x": 1})
         assert r.status_code == 201 and r.json() == {"done": True}
         assert api.servers["CUST-TXT"].calls == [("brand_new_tool", {"x": 1})]
-
     asyncio.run(run())
 
 
@@ -132,7 +126,6 @@ def test_openapi_skips_a_principal_that_cannot_be_served(db, monkeypatch):
     async def run():
         async with _client(api) as http:
             return (await http.get("/v1/openapi.json")).json()
-
     spec = asyncio.run(run())
     assert "/policies/{policy_id}/payments" in spec["paths"] and "/reps/me" not in spec["paths"]
 
@@ -162,7 +155,6 @@ def _receiver(*messages):
 
     async def receive():
         return queue.pop(0)
-
     return receive, queue
 
 
@@ -174,15 +166,12 @@ def test_http_router_ignores_other_scopes_and_drains_refused_bodies(tmp_path):
         sent.append(msg)
 
     async def run():
-        await router({"type": "websocket"}, None, send)  # not HTTP: ignored
-        receive, left = _receiver(
-            {"type": "http.request", "body": b"{", "more_body": True},
-            {"type": "http.request", "body": b"}", "more_body": False},
-        )
+        await router({"type": "websocket"}, None, send)            # not HTTP: ignored
+        receive, left = _receiver({"type": "http.request", "body": b"{", "more_body": True},
+                                  {"type": "http.request", "body": b"}", "more_body": False})
         await router({"type": "http", "headers": []}, receive, send)
         return left
-
-    assert asyncio.run(run()) == []  # the whole body was read first
+    assert asyncio.run(run()) == []                                # the whole body was read first
     assert sent[0]["status"] == 400 and sent[1]["body"] == b"missing X-Customer-Id header"
 
 
@@ -193,9 +182,8 @@ def test_http_router_lifespan_ignores_unknown_messages(tmp_path):
     async def send(msg):
         sent.append(msg["type"])
 
-    receive, _ = _receiver(
-        {"type": "lifespan.startup"}, {"type": "lifespan.something_else"}, {"type": "lifespan.shutdown"}
-    )
+    receive, _ = _receiver({"type": "lifespan.startup"}, {"type": "lifespan.something_else"},
+                           {"type": "lifespan.shutdown"})
     asyncio.run(router({"type": "lifespan"}, receive, send))
     assert sent == ["lifespan.startup.complete", "lifespan.shutdown.complete"] and router.stopping.is_set()
 
@@ -237,7 +225,6 @@ def test_rest_toolbox_handles_non_json_answers():
             tb = RestToolbox(http, "http://api/v1/")
             tb.routes = {"note": ("POST", "/note"), "broken": ("GET", "/fail")}
             return await tb.call("note", {"text": "hi", "skip": None}), await tb.call("broken", {"flag": True})
-
     good, bad = asyncio.run(run())
     assert (good.text, good.is_error) == ("Thanks, noted.", False)
     assert (bad.text, bad.is_error) == ("Bad gateway", True)
@@ -255,9 +242,8 @@ def test_connect_toolbox_over_rest(tmp_path):
     db = tmp_path / "rest.db"
     init_db(db, TODAY)
     port = _free_port()
-    server = uvicorn.Server(
-        uvicorn.Config(InsuranceApi(db, TODAY).app(), host="127.0.0.1", port=port, log_level="warning")
-    )
+    server = uvicorn.Server(uvicorn.Config(InsuranceApi(db, TODAY).app(), host="127.0.0.1", port=port,
+                                           log_level="warning"))
     threading.Thread(target=server.run, daemon=True).start()
     while not server.started:
         time.sleep(0.05)
@@ -267,7 +253,6 @@ def test_connect_toolbox_over_rest(tmp_path):
         async with connect_toolbox(settings, "CUST-002") as tb:
             assert isinstance(tb, RestToolbox) and "list_policies" in tb.tools
             return (await tb.call("list_policies", {})).text
-
     try:
         listed = asyncio.run(run())
     finally:
@@ -282,7 +267,6 @@ def test_connect_toolbox_over_stdio(settings):
         async with connect_toolbox(settings, "CUST-003") as tb:
             assert isinstance(tb, McpToolbox)
             return (await tb.call("get_customer_profile", {})).text
-
     profile = json.loads(asyncio.run(run()))
     assert profile["id"] == "CUST-003"
 

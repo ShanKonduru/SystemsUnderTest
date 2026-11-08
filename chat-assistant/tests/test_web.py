@@ -79,18 +79,10 @@ def test_all_three_demo_users_can_sign_in(web):
 
 def test_chat_is_saved_and_can_be_continued(web):
     app_mod, llm, store = web
-    llm.structured_queue += [
-        intent("billing"),
-        plan("make_payment", "respond"),
-        intent("billing"),
-        plan("get_billing", "respond"),
-    ]
-    llm.executor_queue += [
-        tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})),
-        text("Paid $20."),
-        tools(("get_billing", {"policy_id": "POL-1002"})),
-        text("Balance is $173.60."),
-    ]
+    llm.structured_queue += [intent("billing"), plan("make_payment", "respond"),
+                             intent("billing"), plan("get_billing", "respond")]
+    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20."),
+                           tools(("get_billing", {"policy_id": "POL-1002"})), text("Balance is $173.60.")]
     client = TestClient(app_mod.app)
     login(client)
     conv = client.post("/api/conversations").json()
@@ -112,11 +104,8 @@ def test_chat_is_saved_and_can_be_continued(web):
         assert chat_turn(ws, "what is left to pay?") == "Balance is $173.60."
     resumed_request = llm.create_calls[2]["messages"]
     assert resumed_request[0] == {"role": "user", "content": "pay $20 on my home policy"}
-    assert any(
-        m["role"] == "assistant" and m["content"][0]["text"] == "Paid $20."
-        for m in resumed_request
-        if isinstance(m["content"], list) and m["content"] and m["content"][0].get("type") == "text"
-    )
+    assert any(m["role"] == "assistant" and m["content"][0]["text"] == "Paid $20." for m in resumed_request
+               if isinstance(m["content"], list) and m["content"] and m["content"][0].get("type") == "text")
     assert client.get(f"/api/conversations/{conv['id']}/traces").json()[1]["turn"] == 2
 
 
@@ -183,34 +172,19 @@ def test_upload_proof_and_send_it_in_chat(web):
     app_mod, llm, store = web
     llm.structured_queue += [intent("update_profile"), plan("submit_profile_change", "respond")]
     llm.executor_queue += [
-        tools(
-            (
-                "submit_profile_change",
-                {
-                    "change_type": "mailing_address",
-                    "new_value": "77 Lake Shore Dr, Chicago, IL 60611",
-                    "document_id": "DOC-6001",
-                    "document_type": "utility_bill",
-                    "effective_date": "2026-10-20",
-                },
-            )
-        ),
+        tools(("submit_profile_change", {"change_type": "mailing_address", "new_value": "77 Lake Shore Dr, Chicago, IL 60611",
+                                         "document_id": "DOC-6001", "document_type": "utility_bill",
+                                         "effective_date": "2026-10-20"})),
         text("Address updated (CHG-8001)."),
     ]
     client = TestClient(app_mod.app)
     login(client)
     conv = client.post("/api/conversations").json()
-    up = client.post(
-        f"/api/conversations/{conv['id']}/documents?filename=bill.pdf",
-        content=PDF,
-        headers={"Content-Type": "application/pdf"},
-    )
+    up = client.post(f"/api/conversations/{conv['id']}/documents?filename=bill.pdf", content=PDF,
+                     headers={"Content-Type": "application/pdf"})
     assert up.status_code == 200 and up.json()["document_id"] == "DOC-6001"
-    bad = client.post(
-        f"/api/conversations/{conv['id']}/documents?filename=x.pdf",
-        content=b"not a pdf",
-        headers={"Content-Type": "application/pdf"},
-    )
+    bad = client.post(f"/api/conversations/{conv['id']}/documents?filename=x.pdf", content=b"not a pdf",
+                      headers={"Content-Type": "application/pdf"})
     assert bad.status_code == 400
 
     with client.websocket_connect(f"/ws?conversation={conv['id']}") as ws:
@@ -239,11 +213,8 @@ def test_cannot_attach_someone_elses_document(web):
     login(shan)
     login(indu, "indu")
     conv = shan.post("/api/conversations").json()
-    shan.post(
-        f"/api/conversations/{conv['id']}/documents?filename=bill.pdf",
-        content=PDF,
-        headers={"Content-Type": "application/pdf"},
-    )
+    shan.post(f"/api/conversations/{conv['id']}/documents?filename=bill.pdf", content=PDF,
+              headers={"Content-Type": "application/pdf"})
     iconv = indu.post("/api/conversations").json()
     with indu.websocket_connect(f"/ws?conversation={iconv['id']}") as ws:
         ws.receive_json()

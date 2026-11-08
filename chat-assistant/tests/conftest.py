@@ -31,12 +31,9 @@ def settings(db: Path) -> Settings:
 
 def intent(*names: str, clarify: str = "", **entities: str) -> IntentResult:
     return IntentResult(
-        primary_intent=names[0],
-        intents=list(names),
+        primary_intent=names[0], intents=list(names),
         entities=[Entity(name=k, value=v) for k, v in entities.items()],
-        needs_clarification=bool(clarify),
-        clarification_question=clarify,
-        confidence="high",
+        needs_clarification=bool(clarify), clarification_question=clarify, confidence="high",
     )
 
 

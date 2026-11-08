@@ -18,29 +18,14 @@ async def test_tools_carry_intent_and_confirmation_metadata(db):
         tb = McpToolbox(client)
         await tb.load()
     writes = {n for n, s in tb.tools.items() if s.requires_confirmation}
-    assert writes == {
-        "purchase_policy",
-        "update_policy_coverage",
-        "submit_profile_change",
-        "file_claim",
-        "add_driver",
-        "remove_driver",
-        "add_rider",
-        "remove_rider",
-        "make_payment",
-        "cancel_policy",
-        "request_representative",
-    }
+    assert writes == {"purchase_policy", "update_policy_coverage", "submit_profile_change", "file_claim", "add_driver", "remove_driver", "add_rider", "remove_rider",
+                      "make_payment", "cancel_policy", "request_representative"}
     for name in writes:
         assert not tb.tools[name].read_only
     assert tb.tools["cancel_policy"].destructive
     assert all(spec.intents for spec in tb.tools.values())
-    assert set(tb.tools_for_intents(["billing"])) == {
-        "list_policies",
-        "get_policy_details",
-        "get_billing",
-        "make_payment",
-    }
+    assert set(tb.tools_for_intents(["billing"])) == {"list_policies", "get_policy_details", "get_billing",
+                                                      "make_payment"}
 
 
 async def test_access_denied_is_returned_and_audited(db):

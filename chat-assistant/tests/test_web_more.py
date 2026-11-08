@@ -103,11 +103,8 @@ def test_upload_limits_and_unknown_documents(web, monkeypatch):  # noqa: F811
     login(client)
     conv = client.post("/api/conversations").json()
     monkeypatch.setattr(app_mod, "MAX_DOCUMENT_BYTES", 10)
-    too_big = client.post(
-        f"/api/conversations/{conv['id']}/documents?filename=bill.pdf",
-        content=PDF,
-        headers={"Content-Type": "application/pdf"},
-    )
+    too_big = client.post(f"/api/conversations/{conv['id']}/documents?filename=bill.pdf", content=PDF,
+                          headers={"Content-Type": "application/pdf"})
     assert too_big.status_code == 413
     assert client.get("/api/documents/DOC-9999").status_code == 404
 
@@ -129,10 +126,10 @@ def test_messages_while_a_reply_is_pending(web, db):  # noqa: F811
     with client.websocket_connect(f"/ws?conversation={conv['id']}") as ws:
         ws.receive_json()
         key = _start_write(ws, llm)
-        ws.send_json({"type": "user", "text": "hello again"})  # a second message while waiting
+        ws.send_json({"type": "user", "text": "hello again"})       # a second message while waiting
         assert ws.receive_json() == {"type": "error", "data": {"message": "Please wait for the current reply."}}
-        ws.send_json({"type": "ping"})  # unknown message types are ignored
-        ws.send_json({"type": "user", "text": "   "})  # so are empty messages
+        ws.send_json({"type": "ping"})                               # unknown message types are ignored
+        ws.send_json({"type": "user", "text": "   "})               # so are empty messages
         ws.send_json({"type": "confirm", "key": "confirm-99", "approved": True})  # unknown key: ignored
         ws.send_json({"type": "confirm", "key": key, "approved": True})
         types = []
@@ -145,11 +142,9 @@ def test_messages_while_a_reply_is_pending(web, db):  # noqa: F811
 def test_disconnect_during_an_approval_declines_it_and_the_turn_is_still_saved(web, db):  # noqa: F811
     app_mod, llm, store = web
     llm.structured_queue += [intent("billing"), plan("make_payment", "respond")]
-    llm.executor_queue += [
-        tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})),
-        tools(("make_payment", {"policy_id": "POL-1002", "amount": 30})),
-        text("Nothing was paid."),
-    ]
+    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})),
+                           tools(("make_payment", {"policy_id": "POL-1002", "amount": 30})),
+                           text("Nothing was paid.")]
     client = TestClient(app_mod.app)
     login(client)
     conv = client.post("/api/conversations").json()

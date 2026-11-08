@@ -39,13 +39,8 @@ def audit(db):
 async def test_customer_read_tools(db):
     s = _server(db)
     assert (await ok(s, "get_customer_profile"))["id"] == "CUST-001"
-    assert {p["code"] for p in (await ok(s, "list_products"))["products"]} == {
-        "AUTO",
-        "HOME",
-        "RENTERS",
-        "TRAVEL",
-        "LIFE",
-    }
+    assert {p["code"] for p in (await ok(s, "list_products"))["products"]} == {"AUTO", "HOME", "RENTERS", "TRAVEL",
+                                                                               "LIFE"}
     assert (await ok(s, "list_drivers", {"policy_id": "POL-1001"}))["primary_driver"]["full_name"] == "Shan"
     riders = await ok(s, "list_riders", {"policy_id": "POL-1002"})
     assert riders["policy_id"] == "POL-1002" and riders["product_code"] == "HOME"
@@ -59,47 +54,26 @@ async def test_customer_read_tools(db):
 
 async def test_customer_quote_and_write_tools(db):
     s = _server(db)
-    quote = await ok(
-        s,
-        "get_quote",
-        {
-            "product_code": "RENTERS",
-            "coverage_level": "basic",
-            "deductible": 500,
-            "insured_item": {"property_address": "12 Pier Rd, Springfield, IL 62704", "personal_property_value": 20000},
-        },
-    )
+    quote = await ok(s, "get_quote", {"product_code": "RENTERS", "coverage_level": "basic", "deductible": 500,
+                                      "insured_item": {"property_address": "12 Pier Rd, Springfield, IL 62704",
+                                                       "personal_property_value": 20000}})
     assert quote["quote_id"].startswith("QTE-") and quote["product_code"] == "RENTERS"
     # buying needs the disclosure the app adds only after the customer approved the prompt
     assert (await refused(s, "purchase_policy", {"quote_id": quote["quote_id"]})).startswith("CONSENT_REQUIRED")
     changed = await ok(s, "update_policy_coverage", {"policy_id": "POL-1002", "deductible": 1000})
     assert changed["policy_id"] == "POL-1002" and changed["new"]["deductible"] == 1000
-    added = await ok(
-        s,
-        "add_driver",
-        {"policy_id": "POL-1001", "full_name": "Rowan Quay", "date_of_birth": "1990-06-15", "relationship": "spouse"},
-    )
+    added = await ok(s, "add_driver", {"policy_id": "POL-1001", "full_name": "Rowan Quay", "date_of_birth": "1990-06-15",
+                                       "relationship": "spouse"})
     assert added["policy_id"] == "POL-1001"
-    assert (await refused(s, "remove_driver", {"policy_id": "POL-1001", "driver_id": "DRV-0000"})).startswith(
-        "NOT_FOUND"
-    )
+    assert (await refused(s, "remove_driver", {"policy_id": "POL-1001", "driver_id": "DRV-0000"})).startswith("NOT_FOUND")
     assert (await refused(s, "remove_rider", {"policy_id": "POL-1002", "rider_code": "FLOOD"})).startswith("NOT_FOUND")
     assert ("purchase_policy", "error") in audit(db) and ("update_policy_coverage", "ok") in audit(db)
 
 
 async def test_malformed_dates_are_invalid_requests(db):
     s = _server(db)
-    msg = await refused(
-        s,
-        "file_claim",
-        {
-            "policy_id": "POL-1001",
-            "incident_date": "2026-13-45",
-            "claim_type": "collision",
-            "description": "dent",
-            "estimated_amount": 900,
-        },
-    )
+    msg = await refused(s, "file_claim", {"policy_id": "POL-1001", "incident_date": "2026-13-45",
+                                          "claim_type": "collision", "description": "dent", "estimated_amount": 900})
     assert msg.startswith("INVALID_REQUEST:")
     assert audit(db)[-1] == ("file_claim", "error")
 
@@ -110,21 +84,11 @@ async def test_guest_tools(db):
     assert {"start_application", "get_application_status", "request_representative", "get_quote"} <= names
     assert "get_customer_profile" not in names
     assert (await refused(s, "get_application_status", {"application_id": "APP-0000"})).startswith("NOT_FOUND")
-    app = {
-        "quote_id": "QTE-0000",
-        "full_name": "Marina Coast",
-        "email": "marina@example.com",
-        "date_of_birth": "1990-01-01",
-        "address": "3 Harbor Way, Springfield, IL 62704",
-    }
+    app = {"quote_id": "QTE-0000", "full_name": "Marina Coast", "email": "marina@example.com",
+           "date_of_birth": "1990-01-01", "address": "3 Harbor Way, Springfield, IL 62704"}
     assert (await refused(s, "start_application", app)).startswith("CONSENT_REQUIRED")
-    assert (
-        await refused(
-            s,
-            "request_representative",
-            {"topic": "quote question", "summary": "Asked about renters", "preferred_channel": "chat"},
-        )
-    ).startswith("CONSENT_REQUIRED")
+    assert (await refused(s, "request_representative", {"topic": "quote question", "summary": "Asked about renters",
+                                                        "preferred_channel": "chat"})).startswith("CONSENT_REQUIRED")
 
 
 async def test_representative_tools(db):
@@ -135,13 +99,11 @@ async def test_representative_tools(db):
     assert (await refused(s, "complete_task", {"task_id": "NTE-0000"})).startswith("NOT_FOUND")
     queue = await ok(s, "list_work_queue")
     assert "requests_pending_review" in queue
-    assert (await refused(s, "review_request", {"transaction_id": "TXN-0000", "decision": "approve"})).startswith(
-        "NOT_FOUND"
-    )
+    assert (await refused(s, "review_request", {"transaction_id": "TXN-0000", "decision": "approve"})
+            ).startswith("NOT_FOUND")
     assert (await refused(s, "issue_application", {"application_id": "APP-0000"})).startswith("CONSENT_REQUIRED")
-    assert (await refused(s, "decline_application", {"application_id": "APP-0000", "reason": "incomplete"})).startswith(
-        "NOT_FOUND"
-    )
+    assert (await refused(s, "decline_application", {"application_id": "APP-0000", "reason": "incomplete"})
+            ).startswith("NOT_FOUND")
     assert (await refused(s, "update_handoff", {"handoff_id": "HND-0000", "action": "assign"})).startswith("NOT_FOUND")
 
     await ok(s, "verify_customer", {"customer_id": "CUST-001", "date_of_birth": "1985-04-12", "postal_code": "62701"})
@@ -170,14 +132,8 @@ def test_stdio_entry_point(monkeypatch, db):
     assert started["transport"] == "stdio"
 
 
-@pytest.mark.parametrize(
-    "argv, expected",
-    [
-        ([], ("stdio",)),
-        (["--http", "9123"], ("http", 9123, "127.0.0.1")),
-        (["--http", "9124", "--host", "0.0.0.0"], ("http", 9124, "0.0.0.0")),
-    ],
-)
+@pytest.mark.parametrize("argv, expected", [([], ("stdio",)), (["--http", "9123"], ("http", 9123, "127.0.0.1")),
+                                            (["--http", "9124", "--host", "0.0.0.0"], ("http", 9124, "0.0.0.0"))])
 def test_package_runs_as_a_module(monkeypatch, argv, expected):
     seen = []
     monkeypatch.setattr(server_mod, "main", lambda: seen.append(("stdio",)))

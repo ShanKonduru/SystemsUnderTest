@@ -54,43 +54,22 @@ def feed(monkeypatch, *answers):
 
 
 def args(tmp_path, **overrides):
-    base = dict(
-        customer="CUST-001",
-        db=str(tmp_path / "cli.db"),
-        reset_db=False,
-        auto_approve=False,
-        transport="inprocess",
-        trace=None,
-        verbose=False,
-    )
+    base = dict(customer="CUST-001", db=str(tmp_path / "cli.db"), reset_db=False, auto_approve=False,
+                transport="inprocess", trace=None, verbose=False)
     base.update(overrides)
     return argparse.Namespace(**base)
 
 
 def test_render_prints_every_stage(capsys):
-    cli.render(
-        Event(
-            "intent",
-            {
-                "intents": ["billing", "file_claim"],
-                "confidence": "high",
-                "entities": [{"name": "policy_id", "value": "POL-1002"}],
-            },
-        ),
-        False,
-    )
+    cli.render(Event("intent", {"intents": ["billing", "file_claim"], "confidence": "high",
+                                "entities": [{"name": "policy_id", "value": "POL-1002"}]}), False)
     cli.render(Event("intent", {"intents": ["general_question"], "confidence": "low", "entities": []}), False)
     cli.render(Event("tools_selected", {"tools": []}), False)
     cli.render(Event("tools_selected", {"tools": ["get_billing", "make_payment"]}), False)
     cli.render(Event("plan", {"steps": [{"action": "get_billing"}, {"action": "respond"}]}), False)
     cli.render(Event("tool_call", {"name": "get_billing", "arguments": {"policy_id": "POL-1002"}}), False)
-    base = {
-        "name": "get_billing",
-        "result": "line one\nline two",
-        "is_error": False,
-        "blocked_reason": None,
-        "access_denied": False,
-    }
+    base = {"name": "get_billing", "result": "line one\nline two", "is_error": False, "blocked_reason": None,
+            "access_denied": False}
     cli.render(Event("tool_result", base), True)
     cli.render(Event("tool_result", {**base, "is_error": True}), False)
     cli.render(Event("tool_result", {**base, "is_error": True, "access_denied": True}), False)
@@ -111,34 +90,17 @@ def test_render_prints_every_stage(capsys):
 
 def test_chat_attach_approve_and_save_traces(tmp_path, monkeypatch, capsys, fake_session):
     llm, _ = fake_session
-    llm.structured_queue += [
-        intent("billing"),
-        plan("make_payment", "respond"),
-        intent("billing"),
-        plan("make_payment", "respond"),
-    ]
-    llm.executor_queue += [
-        tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})),
-        text("Paid $20."),
-        tools(("make_payment", {"policy_id": "POL-1002", "amount": 30})),
-        text("Not paid."),
-    ]
+    llm.structured_queue += [intent("billing"), plan("make_payment", "respond"),
+                             intent("billing"), plan("make_payment", "respond")]
+    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20."),
+                           tools(("make_payment", {"policy_id": "POL-1002", "amount": 30})), text("Not paid.")]
     proof = tmp_path / "electric bill.pdf"
     proof.write_bytes(PDF)
     (tmp_path / "notes.txt").write_text("not a proof")
     trace_file = tmp_path / "traces.jsonl"
-    feed(
-        monkeypatch,
-        "",
-        f'/attach "{proof}"',
-        f"/attach {tmp_path / 'missing.pdf'}",
-        f"/attach {tmp_path / 'notes.txt'}",
-        "pay $20 on my home policy",
-        "y",
-        "pay $30 too",
-        "no",
-        "exit",
-    )
+    feed(monkeypatch, "", f'/attach "{proof}"', f"/attach {tmp_path / 'missing.pdf'}",
+         f"/attach {tmp_path / 'notes.txt'}", "pay $20 on my home policy", "y",
+         "pay $30 too", "no", "exit")
     asyncio.run(cli.chat(args(tmp_path, trace=str(trace_file), verbose=True)))
     out = capsys.readouterr().out
     assert "Seeded demo database" in out
@@ -158,18 +120,16 @@ def test_chat_attach_approve_and_save_traces(tmp_path, monkeypatch, capsys, fake
 def test_chat_auto_approve_and_ctrl_c(tmp_path, monkeypatch, capsys, fake_session):
     llm, _ = fake_session
     llm.structured_queue += [intent("cancel_policy"), plan("cancel_policy", "respond")]
-    llm.executor_queue += [
-        tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold the house"})),
-        text("Cancelled."),
-    ]
+    llm.executor_queue += [tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold the house"})),
+                           text("Cancelled.")]
     db = tmp_path / "cli.db"
     prompts = feed(monkeypatch, "quit")
-    asyncio.run(cli.chat(args(tmp_path)))  # first run seeds the database
+    asyncio.run(cli.chat(args(tmp_path)))           # first run seeds the database
     assert "Seeded demo database" in capsys.readouterr().out
     prompts = feed(monkeypatch, "cancel my home policy", KeyboardInterrupt())
     asyncio.run(cli.chat(args(tmp_path, auto_approve=True)))
     out = capsys.readouterr().out
-    assert "Seeded demo database" not in out  # existing database is kept
+    assert "Seeded demo database" not in out       # existing database is kept
     assert "-> auto-approved" in out and "Cancelled." in out
     assert not any("Approve?" in p for p in prompts)
     status = sqlite3.connect(db).execute("SELECT status FROM policies WHERE id='POL-1002'").fetchone()[0]
@@ -192,34 +152,11 @@ def test_main_parses_arguments(monkeypatch, tmp_path):
         seen.update(vars(a))
 
     monkeypatch.setattr(cli, "chat", fake_chat)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "cli",
-            "--customer",
-            "CUST-002",
-            "--db",
-            str(tmp_path / "x.db"),
-            "--reset-db",
-            "--auto-approve",
-            "--transport",
-            "inprocess",
-            "--trace",
-            "t.jsonl",
-            "-v",
-        ],
-    )
+    monkeypatch.setattr(sys, "argv", ["cli", "--customer", "CUST-002", "--db", str(tmp_path / "x.db"), "--reset-db",
+                                      "--auto-approve", "--transport", "inprocess", "--trace", "t.jsonl", "-v"])
     cli.main()
-    assert seen == {
-        "customer": "CUST-002",
-        "db": str(tmp_path / "x.db"),
-        "reset_db": True,
-        "auto_approve": True,
-        "transport": "inprocess",
-        "trace": "t.jsonl",
-        "verbose": True,
-    }
+    assert seen == {"customer": "CUST-002", "db": str(tmp_path / "x.db"), "reset_db": True, "auto_approve": True,
+                    "transport": "inprocess", "trace": "t.jsonl", "verbose": True}
 
 
 def test_main_exits_quietly_on_ctrl_c(monkeypatch):
@@ -236,7 +173,7 @@ def test_main_exits_quietly_on_ctrl_c(monkeypatch):
 def test_module_runs_as_a_script(monkeypatch, tmp_path, capsys, fake_session):
     _, fake_open = fake_session
     monkeypatch.setattr(session_mod, "open_session", fake_open)  # the script imports it afresh
-    monkeypatch.setenv("COPILOT_DB", str(tmp_path / "m.db"))  # database and transport from the environment
+    monkeypatch.setenv("COPILOT_DB", str(tmp_path / "m.db"))          # database and transport from the environment
     monkeypatch.setenv("COPILOT_MCP_TRANSPORT", "inprocess")
     monkeypatch.setattr(sys, "argv", ["cli", "--customer", "CUST-003"])
     feed(monkeypatch, "exit")
