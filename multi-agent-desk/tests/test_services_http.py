@@ -243,3 +243,30 @@ def test_per_identity_servers_are_cached_and_evicted(stack, monkeypatch):
     for member in ("M-1001", "M-2201"):
         ep = triage.post("/requests", json={"message": "Which claims do I have?"}, headers={"X-Principal": member})
         assert ep.json()["status"] == "ok", ep.json()
+
+
+def test_identity_lookup_escapes_the_member_id(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only a well-formed member id reaches the tools URL, as one escaped path segment: "../" or "?" cannot reach
+    another endpoint."""
+    import asyncio
+
+    seen: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.raw_path.decode())
+        if "unknown" in request.url.raw_path.decode():
+            return httpx.Response(404)
+        return httpx.Response(200, json={"identity": "token"})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(answer), **kw))
+    identity_for = service.http_identity(settings)
+    assert asyncio.run(identity_for("M-1001")) == "token"
+    for malformed in ("../admin", "M-1001?drop=1", "M 1001", ""):
+        with pytest.raises(HTTPException) as err:
+            asyncio.run(identity_for(malformed))
+        assert err.value.status_code == 403 and err.value.detail == "malformed member id"
+    assert seen == ["/identity/M-1001"]  # nothing malformed was sent
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(identity_for("unknown"))
+    assert err.value.status_code == 403 and seen[-1] == "/identity/unknown"

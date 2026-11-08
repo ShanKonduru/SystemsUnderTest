@@ -60,7 +60,11 @@ def test_defect_names_are_checked(monkeypatch):
 async def test_handoff_order_defect_asks_claims_first(settings, wiring):
     buggy(settings, wiring, "handoff_order")
     out = await run(settings, wiring, BOTH)
-    assert [(h["from"], h["to"]) for h in out["hops"]] == [("triage", "claims"), ("triage", "billing"), ("billing", "claims")]
+    assert [(h["from"], h["to"]) for h in out["hops"]] == [
+        ("triage", "claims"),
+        ("triage", "billing"),
+        ("billing", "claims"),
+    ]
     assert "$193.60" in out["output"]
 
 
@@ -77,7 +81,9 @@ async def test_wrong_member_defect_delegates_for_someone_else(settings, wiring):
     out = await run(settings, wiring, BOTH)
     assert out["hops"][1]["member"] == "M-2201"
     assert out["steps"][-1]["access_denied"]  # CLM-5003 is not M-2201's claim
-    other = await run(settings, wiring, "Why was my claim CLM-7001 lower than my bill for POL-2001?\nRoute: both", member="M-2201")
+    other = await run(
+        settings, wiring, "Why was my claim CLM-7001 lower than my bill for POL-2001?\nRoute: both", member="M-2201"
+    )
     assert other["hops"][1]["member"] == "M-1001"
 
 

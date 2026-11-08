@@ -11,11 +11,13 @@ key), routes the request, and runs the triage agent, which hands off to the spec
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
@@ -65,6 +67,9 @@ def _health(get_llm: Callable[[], Any], role: str) -> Callable[[], Awaitable[dic
     return healthz
 
 
+MEMBER_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")  # a member id as the desk issues them (e.g. M-1001)
+
+
 def http_identity(settings: Settings) -> IdentityFor:
     async def identity_for(member: str) -> str:
         import httpx
@@ -73,7 +78,11 @@ def http_identity(settings: Settings) -> IdentityFor:
 
         key = settings.signing_key()
         async with httpx.AsyncClient(timeout=30) as http:
-            r = await http.get(f"{settings.tools_url}/identity/{member}", headers={"X-Desk-Proof": proof(key, member)})
+            # a well-formed member id only, and as one escaped path segment: "../" or "?" cannot reach another endpoint
+            if not MEMBER_ID.fullmatch(member):
+                raise HTTPException(status_code=403, detail="malformed member id")
+            url = f"{settings.tools_url}/identity/{quote(member, safe='')}"
+            r = await http.get(url, headers={"X-Desk-Proof": proof(key, member)})
         if r.status_code == 404:
             raise HTTPException(status_code=403, detail=f"unknown member {member}")
         r.raise_for_status()
