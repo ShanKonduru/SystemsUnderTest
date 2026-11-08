@@ -25,5 +25,7 @@ services:
     ports:
       - "127.0.0.1:${CHAT_PORT:-8000}:8000"   # localhost only
     volumes:
-      - ./data:/app/data        # insurance.db, readable from the host (TruAssure snapshots it read-only)
+      # insurance.db, readable from the host (TruAssure snapshots it read-only); CHAT_DATA_DIR gives a second
+      # stack its own data (with -p <project>, CHAT_PORT and CHAT_PROXY_PORT: scripts/chat-stacks)
+      - ${CHAT_DATA_DIR:-./data}:/app/data
     restart: unless-stopped

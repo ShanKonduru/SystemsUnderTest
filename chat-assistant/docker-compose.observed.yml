@@ -15,7 +15,7 @@ services:
       COPILOT_DB: /app/data/insurance.db
       COPILOT_TODAY: ${CHAT_TODAY:-2026-11-03}
     volumes:
-      - ./data:/app/data
+      - ${CHAT_DATA_DIR:-./data}:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 9000), 2).close()"]
       interval: 10s
@@ -34,7 +34,7 @@ services:
     environment:
       TA_PROXY_TOKEN: ${TA_PROXY_TOKEN:-}
     volumes:
-      - ./data/proxy-logs:/logs
+      - ${CHAT_DATA_DIR:-./data}/proxy-logs:/logs
     ports:
       - "127.0.0.1:${CHAT_PROXY_PORT:-9450}:9400"
     depends_on:
