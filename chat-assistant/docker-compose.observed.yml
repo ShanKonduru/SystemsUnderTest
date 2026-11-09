@@ -1,0 +1,54 @@
+# Observed deployment: the assistant's MCP tools run as their own HTTP service, and the TruAssure recording proxy
+# sits between the assistant and them.
+#   docker compose -f SUT/chat-assistant/docker-compose.yml -f SUT/chat-assistant/docker-compose.observed.yml up -d --build
+# Every tool call is logged to SUT/chat-assistant/data/proxy-logs/ (read by TruAssure: the independent record the
+# grader and the trace-vs-proxy check use), with the customer from the X-Customer-Id header; faults can be armed on
+# 127.0.0.1:${CHAT_PROXY_PORT:-9450} with TA_PROXY_TOKEN (from the root .env).
+services:
+  chat-tools:
+    image: harbor-mutual/chat-assistant:dev
+    command: ["python", "-m", "insurance_copilot.mcp_server", "--http", "9000", "--host", "0.0.0.0"]
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      COPILOT_DB: /app/data/insurance.db
+      COPILOT_TODAY: ${CHAT_TODAY:-2026-11-03}
+    volumes:
+      - ${CHAT_DATA_DIR:-./data}:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 9000), 2).close()"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+  chat-proxy:
+    build:
+      context: ../..
+      dockerfile: docker/proxy.Dockerfile
+    image: truassure/proxy:dev
+    command: ["--upstream", "http://chat-tools:9000", "--listen", "0.0.0.0:9400", "--allow-remote",
+              "--log-dir", "/logs", "--principal-header", "X-Customer-Id"]
+    environment:
+      TA_PROXY_TOKEN: ${TA_PROXY_TOKEN:-}
+    volumes:
+      - ${CHAT_DATA_DIR:-./data}/proxy-logs:/logs
+    ports:
+      - "127.0.0.1:${CHAT_PROXY_PORT:-9450}:9400"
+    depends_on:
+      chat-tools: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9400/_ta/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+  chat-assistant:
+    environment:
+      COPILOT_MCP_URL: http://chat-proxy:9400/mcp
+    depends_on:
+      chat-proxy: {condition: service_healthy}

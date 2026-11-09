@@ -1,0 +1,63 @@
+# Harbor Mutual claims task agent (system under test): an event-driven back-office agent with no chat.
+#   docker compose -f SUT/claims-agent/docker-compose.yml up -d --build
+#   curl -X POST http://127.0.0.1:8100/events -H "X-Principal: adjuster-07" -H "Content-Type: application/json" \
+#        -d '{"event": {"type": "claim.document_received", "claim_id": "CLM-5003", "document_id": "DOC-78"}}'
+# The agent calls the tools over MCP (streamable HTTP). To record that traffic, point CLAIMS_TOOLS_URL at a proxy.
+# LLM settings come from the repo root's .env (DEFAULT_LLM_PROVIDER, or CLAIMS_LLM_PROVIDER for this app only).
+name: harbor-claims-agent
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: claims-agent/Dockerfile
+  image: harbor-mutual/claims-agent:dev
+  env_file:
+    - path: ../../.env
+      required: false
+  volumes:
+    - ./data:/app/data          # claims.db and letters/, readable from the host
+  restart: unless-stopped
+
+services:
+  claims-tools:
+    <<: *common
+    command: ["python", "-m", "claims_agent.tools_server", "--host", "0.0.0.0", "--port", "9100"]
+    environment:
+      CLAIMS_TODAY: ${CLAIMS_TODAY:-2026-11-03}
+      CLAIMS_TOOLS_TOKEN: ${CLAIMS_TOOLS_TOKEN:-}
+      CLAIMS_DEFECTS: ${CLAIMS_DEFECTS:-}        # test runs only: a "buggy build" (see claims_agent/defects.py)
+    ports:
+      - "127.0.0.1:${CLAIMS_TOOLS_PORT:-9100}:9100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  claims-agent:
+    <<: *common
+    command: ["uvicorn", "claims_agent.service:app", "--host", "0.0.0.0", "--port", "8100"]
+    environment:
+      CLAIMS_TODAY: ${CLAIMS_TODAY:-2026-11-03}
+      CLAIMS_TOOLS_URL: ${CLAIMS_TOOLS_URL:-http://claims-tools:9100/mcp}
+      CLAIMS_TOOLS_TOKEN: ${CLAIMS_TOOLS_TOKEN:-}
+      CLAIMS_SANDBOX_TOKEN: ${CLAIMS_SANDBOX_TOKEN:-}
+      CLAIMS_MAX_STEPS: ${CLAIMS_MAX_STEPS:-10}
+      CLAIMS_DEFECTS: ${CLAIMS_DEFECTS:-}
+      CLAIMS_ENGINE: ${CLAIMS_ENGINE:-loop}   # loop | langgraph: two builds of the same agent (parity, SE-06)
+      # OpenTelemetry GenAI spans (OTLP/JSON), readable from the host in data/otel/
+      CLAIMS_OTEL_FILE: ${CLAIMS_OTEL_FILE:-/app/data/otel/spans.jsonl}
+      CLAIMS_OTEL_ENDPOINT: ${CLAIMS_OTEL_ENDPOINT:-}
+      CLAIMS_OTEL_TOKEN: ${CLAIMS_OTEL_TOKEN:-}
+    ports:
+      - "127.0.0.1:${CLAIMS_PORT:-8100}:8100"
+    depends_on:
+      claims-tools:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3

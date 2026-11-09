@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Runtime data (databases, generated letters, proxy logs, extra chat stacks) - created by tests and local runs
+**/data/
+**/letters/
+.env
