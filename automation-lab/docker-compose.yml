@@ -12,6 +12,7 @@ services:
     image: harbor-mutual/automation-lab:dev
     env_file:
       - path: ${SUT_ENV_FILE:-../.env}
+        format: raw          # values used as written: a $ in a password stays a $
         required: false
     environment:
       LAB_DATA: /app/data
