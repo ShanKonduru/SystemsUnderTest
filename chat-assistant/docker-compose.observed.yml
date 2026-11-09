@@ -25,10 +25,7 @@ services:
     restart: unless-stopped
 
   chat-proxy:
-    build:
-      context: ${TRUASSURE_DIR:-../../TruAssure-EnterpriseAgenticQualityEngineeringAccelerator}   # TruAssure's repository (the proxy image)
-      dockerfile: docker/proxy.Dockerfile
-    image: truassure/proxy:dev
+    image: ${TRUASSURE_PROXY_IMAGE:-truassure/proxy:dev}   # TruAssure's proxy image (TruAssure's scripts build it)
     command: ["--upstream", "http://chat-tools:9000", "--listen", "0.0.0.0:9400", "--allow-remote",
               "--log-dir", "/logs", "--principal-header", "X-Customer-Id"]
     environment:

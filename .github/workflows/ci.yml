@@ -100,3 +100,32 @@ jobs:
         run: python -m pytest -q --cov
       - name: docker images build
         run: docker compose build
+
+  # After every app's tests pass on main: publish the images TruAssure's pilot tests run (black-box, over HTTP).
+  # Tags: sha-<commit> (what TruAssure pins) and latest.
+  publish-images:
+    name: publish images
+    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-multi-agent-desk]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: build and push
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAG="sha-${GITHUB_SHA::7}"
+          for app in claims-agent:harbor-claims-agent multi-agent-desk:harbor-member-desk chat-assistant:harbor-chat-assistant; do
+            dir="${app%%:*}"; name="${app##*:}"; ref="ghcr.io/$OWNER/$name"
+            docker build -f "$dir/Dockerfile" \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+              -t "$ref:$TAG" -t "$ref:latest" .
+            docker push "$ref:$TAG"
+            docker push "$ref:latest"
+          done
+          echo "published tag $TAG" >> "$GITHUB_STEP_SUMMARY"

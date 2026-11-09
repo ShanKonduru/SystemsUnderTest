@@ -5,10 +5,7 @@
 # Faults are armed on 127.0.0.1:${DESK_PROXY_PORT:-9410} (tools) and 127.0.0.1:${DESK_TAP_PORT:-9510} (agents)
 # with TA_PROXY_TOKEN.
 x-observer: &observer
-  build:
-    context: ${TRUASSURE_DIR:-../../TruAssure-EnterpriseAgenticQualityEngineeringAccelerator}   # TruAssure's repository (the proxy image)
-    dockerfile: docker/proxy.Dockerfile
-  image: truassure/proxy:dev
+  image: ${TRUASSURE_PROXY_IMAGE:-truassure/proxy:dev}   # TruAssure's proxy image (TruAssure's scripts build it)
   environment:
     TA_PROXY_TOKEN: ${TA_PROXY_TOKEN:-}
   restart: unless-stopped

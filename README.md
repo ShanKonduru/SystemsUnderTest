@@ -3,25 +3,16 @@
 Demo applications that TruAssure tests. They belong to the fictitious insurer **Harbor Mutual**; no real
 customer or company data is used anywhere. Each app has its own `docker-compose.yml` for Docker Desktop.
 
-These apps used to live in TruAssure's `SUT/` folder (their history came along). TruAssure expects this repository
-as a clone **next to its own** (or wherever `TA_SUT_DIR` points):
+These apps used to live in TruAssure's `SUT/` folder (their history came along). TruAssure never imports their code:
+it tests them black-box, over HTTP, like any client's agent.
 
-```
-myprojects/
-  TruAssure-EnterpriseAgenticQualityEngineeringAccelerator/   the framework
-  SystemsUnderTest/                                           these apps
-```
-
-The observed deployments (`docker-compose.observed.yml`) put TruAssure's recording proxy in front of an app's tools;
-that image is built from TruAssure's repository (`TRUASSURE_DIR`, default the sibling clone above). TruAssure's
-`scripts/truassure-ops.*` and pilot scripts set both paths and start the apps with TruAssure's `.env`.
-
-| App | Folder | What it is | Status |
-|---|---|---|---|
-| LLM factory | [`common/harbor_llm`](common/harbor_llm) | One interface over every LLM provider, chosen by `DEFAULT_LLM_PROVIDER`; bounded timeouts (`LLM_TIMEOUT`, `LLM_MAX_RETRIES`) | ready (99% coverage, 45 tests) |
-| Chat assistant | [`chat-assistant/`](chat-assistant) | Customer chat: web UI, MCP tool server, SQLite system of record | ready (99% coverage, verified live) |
-| Claims task agent | [`claims-agent/`](claims-agent) | Event-driven back-office agent (no chat): MCP tools over HTTP, SQLite, letters folder | ready (98.7% coverage, verified live) |
-| Multi-agent desk | [`multi-agent-desk/`](multi-agent-desk) | Triage agent handing off to billing and claims agents over HTTP, signed identity carried along, fault switch | ready (98.9% coverage, verified live) |
+- **Images:** on every push to `main` that passes CI, this repository publishes `ghcr.io/shankonduru/harbor-claims-agent`,
+  `harbor-member-desk` and `harbor-chat-assistant`, tagged `sha-<commit>` and `latest`. TruAssure's offline pilot tests
+  pin a `sha-` tag and run those images with a scripted model (no LLM).
+- **Live demos:** TruAssure's `scripts/truassure-ops.*` deploy these apps from a clone of this repository next to
+  TruAssure's (or wherever `TA_SUT_DIR` points), with TruAssure's `.env`. The observed deployments
+  (`docker-compose.observed.yml`) put TruAssure's recording proxy in front of an app's tools; the scripts build that
+  image (`truassure/proxy:dev`) from TruAssure's source first.
 
 ## Configure the LLM once
 
