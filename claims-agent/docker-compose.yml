@@ -1,5 +1,5 @@
 # Harbor Mutual claims task agent (system under test): an event-driven back-office agent with no chat.
-#   docker compose -f SUT/claims-agent/docker-compose.yml up -d --build
+#   docker compose -f claims-agent/docker-compose.yml up -d --build
 #   curl -X POST http://127.0.0.1:8100/events -H "X-Principal: adjuster-07" -H "Content-Type: application/json" \
 #        -d '{"event": {"type": "claim.document_received", "claim_id": "CLM-5003", "document_id": "DOC-78"}}'
 # The agent calls the tools over MCP (streamable HTTP). To record that traffic, point CLAIMS_TOOLS_URL at a proxy.
@@ -12,7 +12,7 @@ x-common: &common
     dockerfile: claims-agent/Dockerfile
   image: harbor-mutual/claims-agent:dev
   env_file:
-    - path: ../../.env
+    - path: ${SUT_ENV_FILE:-../.env}
       required: false
   volumes:
     - ./data:/app/data          # claims.db and letters/, readable from the host

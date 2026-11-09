@@ -1,7 +1,7 @@
 # Observed deployment: the assistant's MCP tools run as their own HTTP service, and the TruAssure recording proxy
 # sits between the assistant and them.
-#   docker compose -f SUT/chat-assistant/docker-compose.yml -f SUT/chat-assistant/docker-compose.observed.yml up -d --build
-# Every tool call is logged to SUT/chat-assistant/data/proxy-logs/ (read by TruAssure: the independent record the
+#   docker compose -f chat-assistant/docker-compose.yml -f chat-assistant/docker-compose.observed.yml up -d --build
+# Every tool call is logged to chat-assistant/data/proxy-logs/ (read by TruAssure: the independent record the
 # grader and the trace-vs-proxy check use), with the customer from the X-Customer-Id header; faults can be armed on
 # 127.0.0.1:${CHAT_PROXY_PORT:-9450} with TA_PROXY_TOKEN (from the root .env).
 services:
@@ -9,7 +9,7 @@ services:
     image: harbor-mutual/chat-assistant:dev
     command: ["python", "-m", "insurance_copilot.mcp_server", "--http", "9000", "--host", "0.0.0.0"]
     env_file:
-      - path: ../../.env
+      - path: ${SUT_ENV_FILE:-../.env}
         required: false
     environment:
       COPILOT_DB: /app/data/insurance.db
@@ -26,7 +26,7 @@ services:
 
   chat-proxy:
     build:
-      context: ../..
+      context: ${TRUASSURE_DIR:-../../TruAssure-EnterpriseAgenticQualityEngineeringAccelerator}   # TruAssure's repository (the proxy image)
       dockerfile: docker/proxy.Dockerfile
     image: truassure/proxy:dev
     command: ["--upstream", "http://chat-tools:9000", "--listen", "0.0.0.0:9400", "--allow-remote",

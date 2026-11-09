@@ -1,0 +1,102 @@
+name: ci
+
+# The demo systems under test that TruAssure's pilots drive: each app's lint, offline tests with its coverage gate,
+# and its Docker images.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sut-llm-factory:
+    name: LLM factory / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: common/harbor_llm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: install with every provider SDK
+        run: python -m pip install -e ".[all,dev]"
+      - name: lint and type-check
+        run: |
+          ruff check src tests
+          mypy
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov
+
+  sut-chat-assistant:
+    name: chat assistant
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chat-assistant
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: install
+        run: python -m pip install -e "../common/harbor_llm[all]" -r requirements.txt pytest pytest-asyncio pytest-cov httpx ruff
+      - name: lint
+        run: ruff check insurance_copilot tests
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov --cov-fail-under=95
+      - name: docker image builds
+        working-directory: .
+        run: docker compose -f chat-assistant/docker-compose.yml build
+
+  sut-claims-agent:
+    name: claims agent
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: claims-agent
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: install
+        run: python -m pip install -e "../common/harbor_llm[all]" -r requirements.txt pytest pytest-asyncio pytest-cov httpx ruff
+      - name: lint
+        run: ruff check claims_agent tests
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov
+      - name: docker images build
+        run: docker compose build
+
+  sut-multi-agent-desk:
+    name: multi-agent desk
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: multi-agent-desk
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: install
+        run: python -m pip install -e "../common/harbor_llm[all]" -r requirements.txt pytest pytest-asyncio pytest-cov ruff
+      - name: lint
+        run: ruff check desk tests
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov
+      - name: docker images build
+        run: docker compose build

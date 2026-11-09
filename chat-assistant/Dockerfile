@@ -1,5 +1,5 @@
 # Harbor Mutual chat assistant: web UI + MCP tool server (stdio subprocess) + SQLite, in one container.
-# Build context is SUT/ (see docker-compose.yml) so the shared LLM factory can be installed.
+# Build context is the repository root (see docker-compose.yml) so the shared LLM factory can be installed.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

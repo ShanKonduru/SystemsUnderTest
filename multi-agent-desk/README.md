@@ -35,10 +35,10 @@ claim CLM-7001 denied), `M-3001` (Sri, billing only). Send the member id in `X-P
 
 ```bat
 :: from the repo root; LLM settings come from the root .env (DEFAULT_LLM_PROVIDER, or DESK_LLM_PROVIDER)
-docker compose -f SUT\multi-agent-desk\docker-compose.yml up -d --build
+docker compose -f multi-agent-desk\docker-compose.yml up -d --build
 curl -X POST http://127.0.0.1:8300/requests -H "X-Principal: M-1001" -H "Content-Type: application/json" ^
      -d "{\"message\": \"Why was my claim CLM-5003 payment lower than my bill for POL-1002?\"}"
-docker compose -f SUT\multi-agent-desk\docker-compose.yml down
+docker compose -f multi-agent-desk\docker-compose.yml down
 ```
 
 The response is triage's account of the episode:
@@ -69,7 +69,7 @@ points the agents at them. Tool calls are logged to `data/proxy-logs/` and hando
 with the member and agent read from the identity token. Faults can be armed on both with `TA_PROXY_TOKEN`.
 
 ```bat
-docker compose -f SUT\multi-agent-desk\docker-compose.yml -f SUT\multi-agent-desk\docker-compose.observed.yml up -d --build
+docker compose -f multi-agent-desk\docker-compose.yml -f multi-agent-desk\docker-compose.observed.yml up -d --build
 ```
 
 ## Planted defects (buggy build)
@@ -88,7 +88,7 @@ An unknown name is an error.
 ## Develop and test
 
 ```bat
-cd SUT\multi-agent-desk
+cd multi-agent-desk
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e ..\common\harbor_llm[all] -r requirements.txt pytest pytest-asyncio pytest-cov ruff
 .venv\Scripts\python -m pytest -q --cov

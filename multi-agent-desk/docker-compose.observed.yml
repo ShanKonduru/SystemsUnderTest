@@ -1,12 +1,12 @@
 # Observed deployment: TruAssure's recording MCP proxy sits in front of the tool server, and its agent-to-agent
 # tap in front of the billing and claims agents.
-#   docker compose -f SUT/multi-agent-desk/docker-compose.yml -f SUT/multi-agent-desk/docker-compose.observed.yml up -d --build
+#   docker compose -f multi-agent-desk/docker-compose.yml -f multi-agent-desk/docker-compose.observed.yml up -d --build
 # Tool calls (with the identity token's member and agent) go to data/proxy-logs/, handoffs to data/a2a-logs/.
 # Faults are armed on 127.0.0.1:${DESK_PROXY_PORT:-9410} (tools) and 127.0.0.1:${DESK_TAP_PORT:-9510} (agents)
 # with TA_PROXY_TOKEN.
 x-observer: &observer
   build:
-    context: ../..
+    context: ${TRUASSURE_DIR:-../../TruAssure-EnterpriseAgenticQualityEngineeringAccelerator}   # TruAssure's repository (the proxy image)
     dockerfile: docker/proxy.Dockerfile
   image: truassure/proxy:dev
   environment:

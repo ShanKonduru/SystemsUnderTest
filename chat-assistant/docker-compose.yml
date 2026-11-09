@@ -1,5 +1,5 @@
 # Harbor Mutual chat assistant (system under test).
-#   docker compose -f SUT/chat-assistant/docker-compose.yml up -d --build
+#   docker compose -f chat-assistant/docker-compose.yml up -d --build
 #   open http://127.0.0.1:8000
 # LLM settings come from the repo root's .env (DEFAULT_LLM_PROVIDER, or CHAT_LLM_PROVIDER for this app only).
 name: harbor-chat-assistant
@@ -11,7 +11,7 @@ services:
       dockerfile: chat-assistant/Dockerfile
     image: harbor-mutual/chat-assistant:dev
     env_file:
-      - path: ../../.env
+      - path: ${SUT_ENV_FILE:-../.env}
         required: false
     environment:
       COPILOT_DB: /app/data/insurance.db

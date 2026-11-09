@@ -3,6 +3,19 @@
 Demo applications that TruAssure tests. They belong to the fictitious insurer **Harbor Mutual**; no real
 customer or company data is used anywhere. Each app has its own `docker-compose.yml` for Docker Desktop.
 
+These apps used to live in TruAssure's `SUT/` folder (their history came along). TruAssure expects this repository
+as a clone **next to its own** (or wherever `TA_SUT_DIR` points):
+
+```
+myprojects/
+  TruAssure-EnterpriseAgenticQualityEngineeringAccelerator/   the framework
+  SystemsUnderTest/                                           these apps
+```
+
+The observed deployments (`docker-compose.observed.yml`) put TruAssure's recording proxy in front of an app's tools;
+that image is built from TruAssure's repository (`TRUASSURE_DIR`, default the sibling clone above). TruAssure's
+`scripts/truassure-ops.*` and pilot scripts set both paths and start the apps with TruAssure's `.env`.
+
 | App | Folder | What it is | Status |
 |---|---|---|---|
 | LLM factory | [`common/harbor_llm`](common/harbor_llm) | One interface over every LLM provider, chosen by `DEFAULT_LLM_PROVIDER`; bounded timeouts (`LLM_TIMEOUT`, `LLM_MAX_RETRIES`) | ready (99% coverage, 45 tests) |
@@ -12,7 +25,7 @@ customer or company data is used anywhere. Each app has its own `docker-compose.
 
 ## Configure the LLM once
 
-Copy [`../.env.example`](../.env.example) to `.env` at the **repo root** and fill in the provider you use. Every
+Copy [`.env.example`](.env.example) to `.env` at this **repository's root** and fill in the provider you use. Every
 app's compose file reads that one file. `DEFAULT_LLM_PROVIDER` picks the provider for all apps;
 `CHAT_LLM_PROVIDER`, `CLAIMS_LLM_PROVIDER` and `DESK_LLM_PROVIDER` override it per app.
 

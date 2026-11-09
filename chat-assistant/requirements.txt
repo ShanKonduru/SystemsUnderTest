@@ -1,5 +1,5 @@
 # Runtime dependencies of the chat assistant. The shared LLM factory is installed from the repo (Docker build
-# context is SUT/, so the path is common/harbor_llm there; locally use ../common/harbor_llm).
+# context is the repository root, so the path is common/harbor_llm there; locally use ../common/harbor_llm).
 mcp>=2.3
 fastapi>=0.115
 uvicorn[standard]>=0.30

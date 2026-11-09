@@ -1,11 +1,11 @@
 # Observed deployment: the TruAssure recording proxy sits between the agent and its MCP tools.
-#   docker compose -f SUT/claims-agent/docker-compose.yml -f SUT/claims-agent/docker-compose.observed.yml up -d --build
-# Every tool call is logged to SUT/claims-agent/data/proxy-logs/ (read by TruAssure), and faults can be armed on
+#   docker compose -f claims-agent/docker-compose.yml -f claims-agent/docker-compose.observed.yml up -d --build
+# Every tool call is logged to claims-agent/data/proxy-logs/ (read by TruAssure), and faults can be armed on
 # 127.0.0.1:${CLAIMS_PROXY_PORT:-9400} with TA_PROXY_TOKEN (from the root .env).
 services:
   claims-proxy:
     build:
-      context: ../..
+      context: ${TRUASSURE_DIR:-../../TruAssure-EnterpriseAgenticQualityEngineeringAccelerator}   # TruAssure's repository (the proxy image)
       dockerfile: docker/proxy.Dockerfile
     image: truassure/proxy:dev
     command: ["--upstream", "http://claims-tools:9100", "--listen", "0.0.0.0:9400", "--allow-remote",

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Harbor Mutual customer chat assistant (demo system under test): intent routing, MCP tools, SQLite backend."
 requires-python = ">=3.11"
 dependencies = [
-    "harbor-llm[all]",          # SUT/common/harbor_llm, installed from the local path (see requirements.txt)
+    "harbor-llm[all]",          # common/harbor_llm, installed from the local path (see requirements.txt)
     "mcp>=2.3",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

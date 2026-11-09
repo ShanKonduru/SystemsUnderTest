@@ -1,5 +1,5 @@
 # Harbor Mutual claims task agent: one image, two roles (MCP tool server, agent service); see docker-compose.yml.
-# Build context is SUT/ so the shared LLM factory can be installed.
+# Build context is the repository root so the shared LLM factory can be installed.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

@@ -23,14 +23,14 @@ CLM-5006 (open, on a lapsed policy).
 
 ```bat
 :: from the repo root; LLM settings come from the root .env (DEFAULT_LLM_PROVIDER, or CLAIMS_LLM_PROVIDER)
-docker compose -f SUT\claims-agent\docker-compose.yml up -d --build
+docker compose -f claims-agent\docker-compose.yml up -d --build
 curl -X POST http://127.0.0.1:8100/events -H "X-Principal: adjuster-07" -H "Content-Type: application/json" ^
      -d "{\"event\": {\"type\": \"claim.document_received\", \"claim_id\": \"CLM-5003\", \"document_id\": \"DOC-78\"}}"
-docker compose -f SUT\claims-agent\docker-compose.yml down
+docker compose -f claims-agent\docker-compose.yml down
 ```
 
 The response is the agent's own account of the episode: `route`, every tool call (`steps`, with arguments and
-outcome), `output`, `done` and token `usage`. The database and letters are in `SUT/claims-agent/data/`, which
+outcome), `output`, `done` and token `usage`. The database and letters are in `claims-agent/data/`, which
 git ignores, so you can inspect them from the host.
 
 | Setting (root `.env`) | Default | Purpose |
@@ -71,7 +71,7 @@ them ([`claims_agent/defects.py`](claims_agent/defects.py)). An unknown name is 
 ## Develop and test
 
 ```bat
-cd SUT\claims-agent
+cd claims-agent
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e ..\common\harbor_llm[all] -r requirements.txt pytest pytest-asyncio pytest-cov httpx ruff
 .venv\Scripts\python -m pytest -q --cov

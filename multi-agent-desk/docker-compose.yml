@@ -1,6 +1,6 @@
 # Harbor Mutual member desk (system under test): a triage agent hands off to billing and claims agents over HTTP,
 # carrying the member's signed identity; every tool call is verified and audited with the agent chain.
-#   docker compose -f SUT/multi-agent-desk/docker-compose.yml up -d --build
+#   docker compose -f multi-agent-desk/docker-compose.yml up -d --build
 #   curl -X POST http://127.0.0.1:8300/requests -H "X-Principal: M-1001" -H "Content-Type: application/json" \
 #        -d '{"message": "Why was my claim CLM-5003 payment lower than my bill for POL-1002?"}'
 # LLM settings come from the repo root's .env (DEFAULT_LLM_PROVIDER, or DESK_LLM_PROVIDER for this app only).
@@ -13,7 +13,7 @@ x-common: &common
     dockerfile: multi-agent-desk/Dockerfile
   image: harbor-mutual/member-desk:dev
   env_file:
-    - path: ../../.env
+    - path: ${SUT_ENV_FILE:-../.env}
       required: false
   volumes:
     - ./data:/app/data          # desk.db and the signing key; readable from the host

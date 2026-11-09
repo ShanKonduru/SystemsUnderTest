@@ -8,10 +8,10 @@ Actions that change data, such as payments or policy changes, ask the customer f
 
 ```bat
 :: from the repo root; LLM settings come from the root .env (see ..\..\.env.example)
-docker compose -f SUT\chat-assistant\docker-compose.yml up -d --build
+docker compose -f chat-assistant\docker-compose.yml up -d --build
 :: open http://127.0.0.1:8000  -  demo customers: shan, indu, sri (password: DEMO_USER_PASSWORD in the root .env)
-docker compose -f SUT\chat-assistant\docker-compose.yml logs -f
-docker compose -f SUT\chat-assistant\docker-compose.yml down        :: add -v to also delete the database volume
+docker compose -f chat-assistant\docker-compose.yml logs -f
+docker compose -f chat-assistant\docker-compose.yml down        :: add -v to also delete the database volume
 ```
 
 | Setting (root `.env`) | Default | Purpose |
@@ -21,13 +21,13 @@ docker compose -f SUT\chat-assistant\docker-compose.yml down        :: add -v to
 | `CHAT_TODAY` | `2026-11-03` | Fixed "today", so dates in answers are reproducible |
 | `CHAT_SANDBOX_TOKEN` | (empty) | Token for the test-control endpoints `/sandbox/status` and `/sandbox/reset`; empty refuses every request |
 
-The port is bound to `127.0.0.1` only. The database is `SUT/chat-assistant/data/insurance.db` (a bind mount,
+The port is bound to `127.0.0.1` only. The database is `chat-assistant/data/insurance.db` (a bind mount,
 git-ignored), created and seeded on first start; TruAssure reads it read-only to diff state.
 
 ## Run it observed (what TruAssure's pilot 0 uses)
 
 ```bat
-docker compose -f SUT\chat-assistant\docker-compose.yml -f SUT\chat-assistant\docker-compose.observed.yml up -d --build
+docker compose -f chat-assistant\docker-compose.yml -f chat-assistant\docker-compose.observed.yml up -d --build
 ```
 
 The assistant's MCP tools then run as their own service (`chat-tools`, MCP over HTTP) behind TruAssure's recording
@@ -39,7 +39,7 @@ deploy chat` deploys it this way.
 ## Develop and test locally
 
 ```bat
-cd SUT\chat-assistant
+cd chat-assistant
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e ..\common\harbor_llm[all] -r requirements.txt pytest pytest-asyncio pytest-cov httpx
 .venv\Scripts\python -m pytest -q

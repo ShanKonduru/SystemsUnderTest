@@ -1,5 +1,5 @@
 # Harbor Mutual member desk: one image, four roles (tools, triage, billing, claims); see docker-compose.yml.
-# Build context is SUT/ so the shared LLM factory can be installed.
+# Build context is the repository root so the shared LLM factory can be installed.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
