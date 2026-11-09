@@ -1,0 +1,31 @@
+# Harbor Mutual Automation Lab (system under test): a web UI for test-script generation, execution and self-healing.
+#   docker compose -f automation-lab/docker-compose.yml up -d --build
+#   open http://127.0.0.1:8400          (no login; ?release=v2 or v3 for the changed UI releases)
+# Settings come from the repo root's .env (LAB_*); the lab needs no LLM.
+name: harbor-automation-lab
+
+services:
+  automation-lab:
+    build:
+      context: ..
+      dockerfile: automation-lab/Dockerfile
+    image: harbor-mutual/automation-lab:dev
+    env_file:
+      - path: ${SUT_ENV_FILE:-../.env}
+        required: false
+    environment:
+      LAB_DATA: /app/data
+      # Fixed "today" so dates and validation are reproducible between runs.
+      LAB_TODAY: ${LAB_TODAY:-2026-11-03}
+      # The UI release served when the URL doesn't ask for one: v1 | v2 | v3 (POST /sandbox/release changes it live).
+      LAB_RELEASE: ${LAB_RELEASE:-v1}
+      # Test-control endpoints (/sandbox/status, /sandbox/reset, /sandbox/release) need this token; empty refuses all.
+      LAB_SANDBOX_TOKEN: ${LAB_SANDBOX_TOKEN:-}
+      LAB_LATENCY_MS: ${LAB_LATENCY_MS:-300}
+      LAB_MAX_UPLOAD_MB: ${LAB_MAX_UPLOAD_MB:-5}
+      LAB_DEFECTS: ${LAB_DEFECTS:-}     # test runs only: a "buggy build" (see automation_lab/defects.py)
+    ports:
+      - "127.0.0.1:${LAB_PORT:-8400}:8400"   # localhost only
+    volumes:
+      - ${LAB_DATA_DIR:-./data}:/app/data    # lab.db and uploads/, readable from the host
+    restart: unless-stopped

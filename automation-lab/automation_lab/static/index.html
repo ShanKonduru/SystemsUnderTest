@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en" data-boot>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor Mutual Automation Lab</title>
+<meta name="description" content="Harbor Mutual Automation Lab: a target for generating, running and self-healing UI test scripts.">
+<style>html[data-boot] body { visibility: hidden; }</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2326357f%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22%23f08a1c%22 font-family=%22sans-serif%22 font-weight=%22700%22%3EHM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/lab.css">
+</head>
+<body>
+<header class="topbar" role="banner">
+  <button class="icon-btn nav-toggle" id="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false">☰</button>
+  <a class="brand" id="brand-link" href="#/overview" aria-label="Harbor Mutual Automation Lab home">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.5V21M5 13a7 7 0 0 0 14 0M8 11h8"/></svg>
+    </span>
+    <span class="brand-name">Harbor Mutual</span>
+    <span class="brand-tag">Automation Lab</span>
+  </a>
+  <div class="topbar-spacer"></div>
+  <label class="release-picker" for="release-select"><span>UI release</span>
+    <select class="input" id="release-select" data-testid="release-select">
+      <option value="v1">v1 · Baseline</option>
+      <option value="v2">v2 · Redesign</option>
+      <option value="v3">v3 · Dynamic</option>
+    </select>
+  </label>
+  <a class="activity-link" id="activity-link" href="#/activity">Activity <span class="badge" id="activity-count" aria-label="activity events">0</span></a>
+</header>
+
+<div class="layout">
+  <nav class="sidenav" id="sidenav" aria-label="Lab areas">
+    <a class="nav-link" id="nav-overview" href="#/overview">Overview</a>
+    <div class="nav-group">Workflows</div>
+    <a class="nav-link" id="nav-quote" href="#/quote" data-testid="nav-quote">Get a quote</a>
+    <a class="nav-link" id="nav-claim" href="#/claim" data-testid="nav-claim">File a claim</a>
+    <div class="nav-group">Controls</div>
+    <a class="nav-link" id="nav-documents" href="#/documents" data-testid="nav-documents">Documents &amp; uploads</a>
+    <a class="nav-link" id="nav-board" href="#/board" data-testid="nav-board">Drag &amp; drop</a>
+    <a class="nav-link" id="nav-policies" href="#/policies" data-testid="nav-policies">Policies table</a>
+    <a class="nav-link" id="nav-interactions" href="#/interactions" data-testid="nav-interactions">Interactions</a>
+    <a class="nav-link" id="nav-dynamic" href="#/dynamic" data-testid="nav-dynamic">Waits &amp; dynamic content</a>
+    <div class="nav-group">Results</div>
+    <a class="nav-link" id="nav-activity" href="#/activity" data-testid="nav-activity">Activity log</a>
+  </nav>
+
+  <main class="content" id="main">
+    <p class="release-banner" id="release-banner" role="status" hidden></p>
+
+    <!-- =============================================================== overview -->
+    <section class="page" id="page-overview" aria-labelledby="overview-title" hidden>
+      <div class="card hero" style="margin-bottom:16px">
+        <h1 id="overview-title">Harbor Mutual Automation Lab</h1>
+        <p class="lead">A practice ground for UI test automation: realistic insurance workflows and every kind of
+          control a generated script has to drive. Nothing here needs a login. What a script does is recorded on the
+          server, so a run can be checked against the system of record as well as the screen.</p>
+        <div class="row">
+          <a class="btn btn-accent" id="overview-start" href="#/quote" data-testid="overview-start">Start with a quote</a>
+          <a class="btn" id="overview-activity" href="#/activity">See the activity log</a>
+        </div>
+      </div>
+      <div class="grid-cards" id="overview-areas">
+        <a class="card area-card" href="#/quote"><h2>Get a quote</h2><p class="muted">A long form with every input type, conditional sections, an autocomplete, client and server validation and a priced result.</p><div class="chips"><span class="chip">select</span><span class="chip">radio</span><span class="chip">checkbox</span><span class="chip">range</span><span class="chip">date</span><span class="chip">switch</span><span class="chip">combobox</span></div></a>
+        <a class="card area-card" href="#/claim"><h2>File a claim</h2><p class="muted">A four-step wizard with a stepper, conditional fields, attachments, review and a typed signature.</p><div class="chips"><span class="chip">wizard</span><span class="chip">datalist</span><span class="chip">multi-select</span><span class="chip">upload</span></div></a>
+        <a class="card area-card" href="#/documents"><h2>Documents &amp; uploads</h2><p class="muted">A plain file input, a drag-and-drop zone with progress, a styled picker with preview, downloads and deletes.</p><div class="chips"><span class="chip">input[type=file]</span><span class="chip">drop files</span><span class="chip">download</span></div></a>
+        <a class="card area-card" href="#/board"><h2>Drag &amp; drop</h2><p class="muted">A claims board (HTML5 drag and drop, saved on the server), a pointer-driven sortable list, a custom slider and a signature pad.</p><div class="chips"><span class="chip">dragstart/drop</span><span class="chip">pointer events</span><span class="chip">canvas</span></div></a>
+        <a class="card area-card" href="#/policies"><h2>Policies table</h2><p class="muted">Server-side search, filters, sorting and paging, row selection, row menus, a details dialog and CSV export.</p><div class="chips"><span class="chip">table</span><span class="chip">pagination</span><span class="chip">menu</span></div></a>
+        <a class="card area-card" href="#/interactions"><h2>Interactions</h2><p class="muted">Double and right clicks, hover, keyboard, native and custom dialogs, new tabs and windows, an iframe and shadow DOM.</p><div class="chips"><span class="chip">alert/confirm/prompt</span><span class="chip">iframe</span><span class="chip">shadow DOM</span><span class="chip">new tab</span></div></a>
+        <a class="card area-card" href="#/dynamic"><h2>Waits &amp; dynamic content</h2><p class="muted">Late, disappearing, re-rendered and slowly enabled elements, progress, toasts and infinite scroll.</p><div class="chips"><span class="chip">explicit waits</span><span class="chip">stale elements</span><span class="chip">infinite scroll</span></div></a>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>UI releases (for self-healing)</h2>
+        <p class="muted">Pick a release in the header, or open the page with <code>?release=v2</code>. Behaviour and
+          data are identical; only locators change. Record on v1, replay on v2 and v3, and watch which locators survive.</p>
+        <div class="table-wrap">
+          <table class="table" id="release-table">
+            <thead><tr><th scope="col">Locator</th><th scope="col">v1 Baseline</th><th scope="col">v2 Redesign</th><th scope="col">v3 Dynamic</th></tr></thead>
+            <tbody>
+              <tr><td>id</td><td><code>quote-first-name</code></td><td><code>hmQuoteFirstName</code></td><td>random per load</td></tr>
+              <tr><td>name</td><td><code>first_name</code></td><td><code>firstName</code></td><td>random per load</td></tr>
+              <tr><td>class</td><td><code>btn-primary</code></td><td><code>ui-btn-primary</code></td><td>random per load</td></tr>
+              <tr><td>data-testid</td><td><code>quote-submit</code></td><td><code>quote-submit</code></td><td>removed</td></tr>
+              <tr><td>Button text</td><td>Get my quote</td><td>Calculate premium</td><td>Calculate premium</td></tr>
+              <tr><td>Absolute XPath</td><td>as authored</td><td>extra wrappers, swapped fields</td><td>extra wrappers, swapped fields</td></tr>
+              <tr><td>Label / role / accessible name</td><td colspan="3">unchanged in every release</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================================================== quote -->
+    <section class="page" id="page-quote" aria-labelledby="quote-title" hidden>
+      <div class="page-head">
+        <h1 id="quote-title">Get a quote</h1>
+        <p class="lead">Price a new policy. The page validates as you go and the server validates again; the premium
+          comes from the server and the quote is saved under a reference number.</p>
+      </div>
+      <div class="grid-2">
+        <form class="card form" id="quote-form" novalidate data-testid="quote-form" aria-describedby="quote-form-alert">
+          <div class="form-alert" id="quote-form-alert" role="alert" hidden></div>
+
+          <fieldset class="fieldset" id="quote-coverage-set">
+            <legend>Coverage</legend>
+            <div class="fields">
+              <div class="field" id="quote-field-product">
+                <label for="quote-product">Product</label>
+                <select class="input" id="quote-product" name="product" required data-testid="quote-product" aria-describedby="quote-product-error">
+                  <option value="">Choose a product…</option>
+                  <option value="auto">Auto</option>
+                  <option value="home">Home</option>
+                  <option value="renters">Renters</option>
+                  <option value="boat">Boat</option>
+                  <option value="life">Term life</option>
+                </select>
+                <p class="field-error" id="quote-product-error"></p>
+              </div>
+              <div class="field" id="quote-field-start-date">
+                <label for="quote-start-date">Coverage start date</label>
+                <input class="input" id="quote-start-date" name="start_date" type="date" required data-testid="quote-start-date" aria-describedby="quote-start-date-hint quote-start-date-error">
+                <span class="hint" id="quote-start-date-hint">Within the next 90 days.</span>
+                <p class="field-error" id="quote-start-date-error"></p>
+              </div>
+            </div>
+            <fieldset class="choice-group" id="quote-coverage-group" aria-describedby="quote-coverage-error">
+              <legend>Coverage level</legend>
+              <div class="segmented">
+                <label class="choice"><input type="radio" id="quote-coverage-basic" name="coverage" value="basic" data-testid="quote-coverage-basic"><span>Basic</span></label>
+                <label class="choice"><input type="radio" id="quote-coverage-standard" name="coverage" value="standard" checked data-testid="quote-coverage-standard"><span>Standard</span></label>
+                <label class="choice"><input type="radio" id="quote-coverage-premium" name="coverage" value="premium" data-testid="quote-coverage-premium"><span>Premium</span></label>
+              </div>
+              <p class="field-error" id="quote-coverage-error"></p>
+            </fieldset>
+            <div class="field" id="quote-field-deductible">
+              <label for="quote-deductible">Deductible</label>
+              <div class="range-row">
+                <input id="quote-deductible" name="deductible" type="range" min="0" max="2" step="1" value="1" data-testid="quote-deductible" aria-valuetext="$1,000">
+                <output class="range-value" id="quote-deductible-value" for="quote-deductible">$1,000</output>
+              </div>
+              <span class="hint">$500 · $1,000 · $2,500. A higher deductible lowers the premium.</span>
+            </div>
+            <fieldset class="choice-group" id="quote-addons-group" aria-describedby="quote-addons-hint quote-addons-error">
+              <legend>Add-ons</legend>
+              <label class="choice"><input type="checkbox" id="quote-addon-roadside" name="addons" value="roadside" data-testid="quote-addon-roadside"><span>Roadside assistance (+$48)</span></label>
+              <label class="choice"><input type="checkbox" id="quote-addon-rental" name="addons" value="rental" data-testid="quote-addon-rental"><span>Rental car (+$72)</span></label>
+              <label class="choice"><input type="checkbox" id="quote-addon-glass" name="addons" value="glass" data-testid="quote-addon-glass"><span>Glass cover (+$36)</span></label>
+              <label class="choice"><input type="checkbox" id="quote-addon-flood" name="addons" value="flood" data-testid="quote-addon-flood"><span>Flood (+$210)</span></label>
+              <label class="choice"><input type="checkbox" id="quote-addon-jewelry" name="addons" value="jewelry" data-testid="quote-addon-jewelry"><span>Jewelry rider (+$95)</span></label>
+              <span class="hint" id="quote-addons-hint">Add-ons that don't apply to the chosen product are disabled.</span>
+              <p class="field-error" id="quote-addons-error"></p>
+            </fieldset>
+          </fieldset>
+
+          <fieldset class="fieldset" id="quote-auto-set" hidden>
+            <legend>Your vehicle</legend>
+            <div class="fields">
+              <div class="field combo" id="quote-field-make">
+                <label for="quote-make" id="quote-make-label">Vehicle make</label>
+                <input class="input" id="quote-make" name="vehicle_make" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="quote-make-list" placeholder="Start typing a make…" data-testid="quote-make">
+                <ul class="listbox" id="quote-make-list" role="listbox" aria-labelledby="quote-make-label" hidden></ul>
+              </div>
+              <div class="field" id="quote-field-year">
+                <label for="quote-vehicle-year">Model year</label>
+                <input class="input" id="quote-vehicle-year" name="vehicle_year" type="number" min="1990" max="2027" step="1" placeholder="2022" data-testid="quote-vehicle-year">
+              </div>
+              <div class="field" id="quote-field-mileage">
+                <label for="quote-mileage">Annual mileage</label>
+                <select class="input" id="quote-mileage" name="mileage" data-testid="quote-mileage">
+                  <option value="lt5k">Under 5,000</option>
+                  <option value="5-10k" selected>5,000 – 10,000</option>
+                  <option value="10-15k">10,000 – 15,000</option>
+                  <option value="gt15k">Over 15,000</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="fieldset" id="quote-home-set" hidden>
+            <legend>Your property</legend>
+            <div class="fields">
+              <div class="field">
+                <label for="quote-property-type">Property type</label>
+                <select class="input" id="quote-property-type" name="property_type" data-testid="quote-property-type">
+                  <option value="house">House</option><option value="condo">Condo</option><option value="townhouse">Townhouse</option><option value="apartment">Apartment</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="quote-square-feet">Square feet</label>
+                <input class="input" id="quote-square-feet" name="square_feet" type="number" min="200" max="20000" step="50" placeholder="1800" data-testid="quote-square-feet">
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="fieldset" id="quote-boat-set" hidden>
+            <legend>Your boat</legend>
+            <div class="fields">
+              <div class="field">
+                <label for="quote-boat-length">Length (feet)</label>
+                <input class="input" id="quote-boat-length" name="boat_length" type="number" min="8" max="80" placeholder="22" data-testid="quote-boat-length">
+              </div>
+              <fieldset class="choice-group">
+                <legend>Hull</legend>
+                <label class="choice"><input type="radio" name="hull" value="fiberglass" checked><span>Fiberglass</span></label>
+                <label class="choice"><input type="radio" name="hull" value="aluminum"><span>Aluminum</span></label>
+                <label class="choice"><input type="radio" name="hull" value="wood"><span>Wood</span></label>
+              </fieldset>
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset" id="quote-about-set">
+            <legend>About you</legend>
+            <div class="fields">
+              <div class="field" id="quote-field-first-name">
+                <label for="quote-first-name">First name</label>
+                <input class="input" id="quote-first-name" name="first_name" type="text" autocomplete="given-name" required maxlength="40" data-testid="quote-first-name" aria-describedby="quote-first-name-error">
+                <p class="field-error" id="quote-first-name-error"></p>
+              </div>
+              <div class="field" id="quote-field-last-name">
+                <label for="quote-last-name">Last name</label>
+                <input class="input" id="quote-last-name" name="last_name" type="text" autocomplete="family-name" required maxlength="40" data-testid="quote-last-name" aria-describedby="quote-last-name-error">
+                <p class="field-error" id="quote-last-name-error"></p>
+              </div>
+              <div class="field" id="quote-field-dob">
+                <label for="quote-dob">Date of birth</label>
+                <input class="input" id="quote-dob" name="date_of_birth" type="date" required data-testid="quote-dob" aria-describedby="quote-dob-error">
+                <p class="field-error" id="quote-dob-error"></p>
+              </div>
+              <div class="field" id="quote-field-email">
+                <label for="quote-email">Email</label>
+                <input class="input" id="quote-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" data-testid="quote-email" aria-describedby="quote-email-error">
+                <p class="field-error" id="quote-email-error"></p>
+              </div>
+              <div class="field" id="quote-field-phone">
+                <label for="quote-phone">Phone <span class="muted">(optional)</span></label>
+                <input class="input" id="quote-phone" name="phone" type="tel" autocomplete="tel" placeholder="(555) 010-2030" data-testid="quote-phone" aria-describedby="quote-phone-error">
+                <p class="field-error" id="quote-phone-error"></p>
+              </div>
+              <div class="field" id="quote-field-zip">
+                <label for="quote-zip">ZIP code</label>
+                <input class="input" id="quote-zip" name="zip" type="text" inputmode="numeric" maxlength="5" required placeholder="02110" data-testid="quote-zip" aria-describedby="quote-zip-error">
+                <p class="field-error" id="quote-zip-error"></p>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset" id="quote-billing-set">
+            <legend>Billing</legend>
+            <fieldset class="choice-group" aria-describedby="quote-payment-plan-error">
+              <legend>Payment plan</legend>
+              <label class="choice"><input type="radio" id="quote-plan-annual" name="payment_plan" value="annual" checked data-testid="quote-plan-annual"><span>Pay yearly</span></label>
+              <label class="choice"><input type="radio" id="quote-plan-monthly" name="payment_plan" value="monthly" data-testid="quote-plan-monthly"><span>Pay monthly (+4%)</span></label>
+              <p class="field-error" id="quote-payment-plan-error"></p>
+            </fieldset>
+            <div class="row" style="gap:24px">
+              <div class="switch" id="quote-paperless" role="switch" tabindex="0" aria-checked="false" aria-labelledby="quote-paperless-label" data-testid="quote-paperless">
+                <span class="switch-track" aria-hidden="true"></span><span id="quote-paperless-label">Paperless billing (−3%)</span>
+              </div>
+              <label class="choice"><input type="checkbox" id="quote-multi-policy" name="multi_policy" data-testid="quote-multi-policy"><span>I have another Harbor Mutual policy (−10%)</span></label>
+            </div>
+            <div class="field">
+              <label for="quote-notes">Anything else we should know?</label>
+              <textarea class="input" id="quote-notes" name="notes" maxlength="500" data-testid="quote-notes" aria-describedby="quote-notes-count"></textarea>
+              <span class="hint counter" id="quote-notes-count" aria-live="polite">0 / 500</span>
+            </div>
+            <label class="choice"><input type="checkbox" id="quote-consent" name="consent" required data-testid="quote-consent" aria-describedby="quote-consent-error"><span>I agree that Harbor Mutual may contact me about this quote.</span></label>
+            <p class="field-error" id="quote-consent-error"></p>
+          </fieldset>
+
+          <div class="form-actions">
+            <button class="btn" id="quote-reset" type="reset" data-testid="quote-reset" data-t>Start over</button>
+            <button class="btn btn-primary" id="quote-submit" type="submit" data-testid="quote-submit" data-t>Get my quote</button>
+          </div>
+        </form>
+
+        <aside class="card sticky" id="quote-result" aria-live="polite" aria-labelledby="quote-result-title" data-testid="quote-result">
+          <h2 id="quote-result-title">Your quote</h2>
+          <div class="result-empty" id="quote-result-empty">Fill in the form and choose <strong>Get my quote</strong>.</div>
+          <div id="quote-result-loading" hidden><span class="spinner"></span> Pricing your policy…</div>
+          <div id="quote-result-body" hidden>
+            <div class="muted small">Quote reference</div>
+            <div class="ref" id="quote-ref" data-testid="quote-ref"></div>
+            <div class="result-amount" id="quote-premium" data-testid="quote-premium"></div>
+            <div class="muted" id="quote-monthly" data-testid="quote-monthly"></div>
+            <div class="table-wrap" style="margin-top:12px">
+              <table class="table" aria-label="Premium breakdown">
+                <tbody id="quote-breakdown"></tbody>
+              </table>
+            </div>
+            <p class="small muted" id="quote-discount-note" style="margin-top:8px" hidden>Multi-policy discount of 10% applied.</p>
+            <div class="row" style="margin-top:12px">
+              <a class="btn" id="quote-download" download="harbor-mutual-quote.json" href="#" data-testid="quote-download">Download quote</a>
+              <a class="btn" href="#/claim">File a claim instead</a>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- =============================================================== claim wizard -->
+    <section class="page" id="page-claim" aria-labelledby="claim-title" hidden>
+      <div class="page-head">
+        <h1 id="claim-title">File a claim</h1>
+        <p class="lead">Four steps. Each step is checked before you can continue; the server checks everything again
+          when you submit. Try policy <code>POL-1001</code> (Shan Mercer) or <code>POL-1003</code> (Sri Nair);
+          <code>POL-1002</code> has lapsed, so it can't take a claim.</p>
+      </div>
+      <ol class="stepper" id="claim-stepper" aria-label="Claim steps">
+        <li class="step" id="claim-step-tab-1"><span class="step-num">1</span>Policy &amp; incident</li>
+        <li class="step" id="claim-step-tab-2"><span class="step-num">2</span>What happened</li>
+        <li class="step" id="claim-step-tab-3"><span class="step-num">3</span>Documents</li>
+        <li class="step" id="claim-step-tab-4"><span class="step-num">4</span>Review &amp; sign</li>
+      </ol>
+      <form class="card form" id="claim-form" novalidate data-testid="claim-form">
+        <div class="form-alert" id="claim-form-alert" role="alert" hidden></div>
+
+        <div class="claim-step" id="claim-step-1" role="group" aria-labelledby="claim-step-1-title">
+          <h2 id="claim-step-1-title">Step 1 of 4: Policy &amp; incident</h2>
+          <div class="fields">
+            <div class="field" id="claim-field-policy">
+              <label for="claim-policy">Policy number</label>
+              <input class="input" id="claim-policy" name="policy_number" list="claim-policy-options" autocomplete="off" required placeholder="POL-1001" data-testid="claim-policy" aria-describedby="claim-policy-holder claim-policy-error">
+              <datalist id="claim-policy-options"></datalist>
+              <div class="holder-note" id="claim-policy-holder" aria-live="polite" hidden></div>
+              <p class="field-error" id="claim-policy-error"></p>
+            </div>
+            <div class="field" id="claim-field-incident-type">
+              <label for="claim-incident-type">What happened?</label>
+              <select class="input" id="claim-incident-type" name="incident_type" required data-testid="claim-incident-type" aria-describedby="claim-incident-type-error">
+                <option value="">Choose one…</option>
+                <option value="collision">Collision</option><option value="theft">Theft or break-in</option>
+                <option value="water">Water damage</option><option value="fire">Fire or smoke</option>
+                <option value="weather">Storm or hail</option><option value="other">Something else</option>
+              </select>
+              <p class="field-error" id="claim-incident-type-error"></p>
+            </div>
+            <div class="field" id="claim-field-incident-date">
+              <label for="claim-incident-date">Date of incident</label>
+              <input class="input" id="claim-incident-date" name="incident_date" type="date" required data-testid="claim-incident-date" aria-describedby="claim-incident-date-error">
+              <p class="field-error" id="claim-incident-date-error"></p>
+            </div>
+            <div class="field" id="claim-field-incident-time">
+              <label for="claim-incident-time">Approximate time <span class="muted">(optional)</span></label>
+              <input class="input" id="claim-incident-time" name="incident_time" type="time" data-testid="claim-incident-time">
+            </div>
+            <div class="field" id="claim-field-location">
+              <label for="claim-location">Where did it happen?</label>
+              <input class="input" id="claim-location" name="location" type="text" required placeholder="Street, city" data-testid="claim-location" aria-describedby="claim-location-error">
+              <p class="field-error" id="claim-location-error"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="claim-step" id="claim-step-2" role="group" aria-labelledby="claim-step-2-title" hidden>
+          <h2 id="claim-step-2-title">Step 2 of 4: What happened</h2>
+          <div class="field">
+            <label for="claim-description">Describe what happened</label>
+            <textarea class="input" id="claim-description" name="description" required maxlength="2000" data-testid="claim-description" aria-describedby="claim-description-count claim-description-error"></textarea>
+            <span class="hint counter" id="claim-description-count">0 / 2000 (at least 20)</span>
+            <p class="field-error" id="claim-description-error"></p>
+          </div>
+          <div class="fields">
+            <fieldset class="choice-group" id="claim-police-group">
+              <legend>Was a police report filed?</legend>
+              <label class="choice"><input type="radio" id="claim-police-yes" name="police_report" value="yes" data-testid="claim-police-yes"><span>Yes</span></label>
+              <label class="choice"><input type="radio" id="claim-police-no" name="police_report" value="no" checked data-testid="claim-police-no"><span>No</span></label>
+            </fieldset>
+            <div class="field" id="claim-field-report-number" hidden>
+              <label for="claim-report-number">Police report number</label>
+              <input class="input" id="claim-report-number" name="report_number" type="text" data-testid="claim-report-number" aria-describedby="claim-report-number-error">
+              <p class="field-error" id="claim-report-number-error"></p>
+            </div>
+            <div class="field">
+              <label for="claim-estimate">Estimated damage (USD)</label>
+              <input class="input" id="claim-estimate" name="estimate" type="number" min="1" max="1000000" step="0.01" required placeholder="2500" data-testid="claim-estimate" aria-describedby="claim-estimate-error">
+              <p class="field-error" id="claim-estimate-error"></p>
+            </div>
+          </div>
+          <label class="choice"><input type="checkbox" id="claim-injuries" name="injuries" data-testid="claim-injuries"><span>Someone was injured</span></label>
+          <div class="fields">
+            <fieldset class="choice-group" aria-describedby="claim-contact-error">
+              <legend>How should we contact you?</legend>
+              <label class="choice"><input type="radio" id="claim-contact-email" name="contact" value="email" checked data-testid="claim-contact-email"><span>Email</span></label>
+              <label class="choice"><input type="radio" id="claim-contact-phone" name="contact" value="phone" data-testid="claim-contact-phone"><span>Phone call</span></label>
+              <label class="choice"><input type="radio" id="claim-contact-text" name="contact" value="text" data-testid="claim-contact-text"><span>Text message</span></label>
+              <p class="field-error" id="claim-contact-error"></p>
+            </fieldset>
+            <div class="field">
+              <label for="claim-days">Days you're available <span class="muted">(Ctrl/⌘-click for several)</span></label>
+              <select class="input" id="claim-days" name="available_days" multiple data-testid="claim-days">
+                <option value="mon">Monday</option><option value="tue">Tuesday</option><option value="wed">Wednesday</option>
+                <option value="thu">Thursday</option><option value="fri">Friday</option><option value="sat">Saturday</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="claim-step" id="claim-step-3" role="group" aria-labelledby="claim-step-3-title" hidden>
+          <h2 id="claim-step-3-title">Step 3 of 4: Documents <span class="muted small">(optional)</span></h2>
+          <p class="muted">Photos, repair estimates or the police report. PDF, PNG, JPG, TXT or CSV, up to 5 MB each.</p>
+          <div class="field">
+            <label for="claim-files">Attach files</label>
+            <input class="input" id="claim-files" name="claim_files" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" data-testid="claim-files">
+          </div>
+          <div class="dropzone dropzone-small" id="claim-dropzone" role="button" tabindex="0" aria-label="Drop claim files here or press Enter to browse" data-testid="claim-dropzone">…or drop files here</div>
+          <ul class="file-list" id="claim-file-list" aria-label="Attached files"></ul>
+        </div>
+
+        <div class="claim-step" id="claim-step-4" role="group" aria-labelledby="claim-step-4-title" hidden>
+          <h2 id="claim-step-4-title">Step 4 of 4: Review &amp; sign</h2>
+          <dl class="kv" id="claim-review" data-testid="claim-review"></dl>
+          <div class="field" style="margin-top:14px">
+            <label for="claim-signature">Sign by typing the policyholder's full name</label>
+            <input class="input" id="claim-signature" name="signature" type="text" autocomplete="off" required data-testid="claim-signature" aria-describedby="claim-signature-error">
+            <p class="field-error" id="claim-signature-error"></p>
+          </div>
+          <label class="choice"><input type="checkbox" id="claim-agree" name="agree" required data-testid="claim-agree" aria-describedby="claim-agree-error"><span>The information I've given is true and complete.</span></label>
+          <p class="field-error" id="claim-agree-error"></p>
+        </div>
+
+        <div class="card success" id="claim-done" role="status" hidden data-testid="claim-done">
+          <h2>Claim received</h2>
+          <p>Your claim number is <span class="ref" id="claim-number" data-testid="claim-number"></span>. An adjuster will contact you within two business days.</p>
+          <button class="btn" id="claim-again" type="button" data-testid="claim-again" data-t>File another claim</button>
+        </div>
+
+        <div class="form-actions" id="claim-actions">
+          <button class="btn" id="claim-back" type="button" data-testid="claim-back" data-t>Back</button>
+          <button class="btn btn-primary" id="claim-next" type="button" data-testid="claim-next" data-t>Next</button>
+          <button class="btn btn-accent" id="claim-submit" type="submit" data-testid="claim-submit" hidden data-t>Submit claim</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- =============================================================== documents -->
+    <section class="page" id="page-documents" aria-labelledby="documents-title" hidden>
+      <div class="page-head">
+        <h1 id="documents-title">Documents &amp; uploads</h1>
+        <p class="lead">Three ways to send a file, all to the same store. Allowed: PDF, PNG, JPG, TXT, CSV up to
+          <span id="docs-limit">5 MB</span>. Anything else is rejected with a reason.</p>
+      </div>
+      <div class="grid-cards">
+        <div class="card" id="docs-card-input">
+          <h2>Standard file input</h2>
+          <p class="card-sub">A visible <code>&lt;input type="file" multiple&gt;</code> and an Upload button.</p>
+          <form class="form" id="docs-form" data-testid="docs-form">
+            <div class="field">
+              <label for="docs-file-input">Files</label>
+              <input class="input" id="docs-file-input" name="files" type="file" multiple data-testid="docs-file-input">
+            </div>
+            <div class="field">
+              <label for="docs-category">Category</label>
+              <select class="input" id="docs-category" name="category" data-testid="docs-category">
+                <option value="id">Proof of identity</option><option value="estimate">Repair estimate</option>
+                <option value="photo">Photo</option><option value="other" selected>Other</option>
+              </select>
+            </div>
+            <div class="row"><button class="btn btn-primary" id="docs-upload" type="submit" disabled data-testid="docs-upload" data-t>Upload</button>
+              <span class="small muted" id="docs-input-status" role="status"></span></div>
+          </form>
+        </div>
+        <div class="card" id="docs-card-dropzone">
+          <h2>Drag &amp; drop zone</h2>
+          <p class="card-sub">Drop files from your computer. Uploads start at once, with progress.</p>
+          <div class="dropzone" id="docs-dropzone" role="button" tabindex="0" aria-label="Drop files here, or press Enter to browse" aria-describedby="docs-dropzone-hint" data-testid="docs-dropzone">
+            <strong>Drop files here</strong><br><span class="muted">or <span class="btn-link" data-t>Browse files</span></span>
+          </div>
+          <input id="docs-dropzone-input" type="file" multiple hidden data-testid="docs-dropzone-input">
+          <p class="hint" id="docs-dropzone-hint">The zone highlights while files are dragged over it.</p>
+          <div class="progress" id="docs-progress" role="progressbar" aria-label="Upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div class="progress-bar" id="docs-progress-bar"></div></div>
+          <ul class="file-list" id="docs-drop-results" aria-label="Drop results"></ul>
+        </div>
+        <div class="card" id="docs-card-photo">
+          <h2>Styled picker with preview</h2>
+          <p class="card-sub">The real input is hidden behind a button; an image shows a preview before upload.</p>
+          <button class="btn" id="docs-photo-button" type="button" data-testid="docs-photo-button" data-t>Choose a photo</button>
+          <input id="docs-photo-input" type="file" accept="image/png,image/jpeg" hidden data-testid="docs-photo-input">
+          <div id="docs-photo-preview-wrap" style="margin-top:10px" hidden>
+            <img class="preview" id="docs-photo-preview" alt="Selected photo preview">
+            <div class="small muted" id="docs-photo-name"></div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn btn-primary btn-small" id="docs-photo-upload" type="button" data-testid="docs-photo-upload">Upload photo</button>
+              <button class="btn btn-small" id="docs-photo-clear" type="button">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="spread"><h2>Uploaded files</h2>
+          <div class="row"><button class="btn btn-small" id="docs-refresh" type="button" data-testid="docs-refresh">Refresh</button>
+            <a class="btn btn-small" id="docs-download-csv" href="/api/policies.csv" download data-testid="docs-download-csv">Download policy list (CSV)</a></div></div>
+        <div class="table-wrap">
+          <table class="table" id="docs-table" data-testid="docs-table">
+            <thead><tr><th scope="col">Reference</th><th scope="col">Name</th><th scope="col">From</th><th scope="col" class="num">Size</th><th scope="col">Uploaded</th><th scope="col">Actions</th></tr></thead>
+            <tbody id="docs-tbody"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="docs-empty" style="margin-top:8px">No files yet.</p>
+      </div>
+    </section>
+
+    <!-- =============================================================== board -->
+    <section class="page" id="page-board" aria-labelledby="board-title" hidden>
+      <div class="page-head">
+        <h1 id="board-title">Drag &amp; drop</h1>
+        <p class="lead">The claims board uses native HTML5 drag and drop and saves every move on the server (reload to
+          check). The priority list and the slider use pointer events instead, which need real mouse moves.</p>
+      </div>
+      <div class="card">
+        <div class="spread"><h2>Claims board</h2><span class="small muted" id="board-status" role="status"></span></div>
+        <div class="board" id="board" data-testid="board">
+          <div class="lane" id="lane-new" role="list" aria-labelledby="lane-new-title" data-testid="lane-new"><div class="lane-head"><span id="lane-new-title">New</span><span class="lane-count" id="lane-new-count">0</span></div></div>
+          <div class="lane" id="lane-review" role="list" aria-labelledby="lane-review-title" data-testid="lane-review"><div class="lane-head"><span id="lane-review-title">In review</span><span class="lane-count" id="lane-review-count">0</span></div></div>
+          <div class="lane" id="lane-approved" role="list" aria-labelledby="lane-approved-title" data-testid="lane-approved"><div class="lane-head"><span id="lane-approved-title">Approved</span><span class="lane-count" id="lane-approved-count">0</span></div></div>
+          <div class="lane" id="lane-paid" role="list" aria-labelledby="lane-paid-title" data-testid="lane-paid"><div class="lane-head"><span id="lane-paid-title">Paid</span><span class="lane-count" id="lane-paid-count">0</span></div></div>
+        </div>
+      </div>
+      <div class="grid-cards" style="margin-top:16px">
+        <div class="card">
+          <h2>Rank your priorities</h2>
+          <p class="card-sub">Drag a row by its handle (pointer events), or focus the handle and use ↑ / ↓.</p>
+          <ol class="sortable" id="priority-list" aria-label="Priorities" data-testid="priority-list"></ol>
+          <p class="small muted" id="priority-order" role="status" style="margin-top:8px"></p>
+        </div>
+        <div class="card">
+          <h2>Coverage limit</h2>
+          <p class="card-sub">A custom slider: drag the thumb, click the track, or use the arrow keys.</p>
+          <div class="cslider" id="limit-slider" data-testid="limit-slider">
+            <div class="cslider-track"></div><div class="cslider-fill" id="limit-fill"></div>
+            <div class="cslider-thumb" id="limit-thumb" role="slider" tabindex="0" aria-label="Coverage limit" aria-valuemin="50000" aria-valuemax="1000000" aria-valuenow="300000" aria-valuetext="$300,000" data-testid="limit-thumb"></div>
+          </div>
+          <div class="spread"><span class="muted small">$50,000</span><strong id="limit-value" data-testid="limit-value">$300,000</strong><span class="muted small">$1,000,000</span></div>
+        </div>
+        <div class="card">
+          <h2>Signature pad</h2>
+          <p class="card-sub">Draw with the mouse or a finger on a canvas.</p>
+          <canvas class="signature-pad" id="signature-pad" aria-label="Signature pad" data-testid="signature-pad"></canvas>
+          <div class="spread" style="margin-top:8px"><span class="small muted" id="signature-status" role="status" data-testid="signature-status">Not signed</span>
+            <button class="btn btn-small" id="signature-clear" type="button" data-testid="signature-clear">Clear</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================================================== policies -->
+    <section class="page" id="page-policies" aria-labelledby="policies-title" hidden>
+      <div class="page-head">
+        <h1 id="policies-title">Policies table</h1>
+        <p class="lead">Search, filtering, sorting and paging run on the server, each after a short network wait.</p>
+      </div>
+      <div class="card">
+        <form class="toolbar" id="policies-toolbar" role="search" data-testid="policies-toolbar">
+          <div class="field" style="flex:1">
+            <label for="policies-search">Search</label>
+            <input class="input" id="policies-search" name="q" type="search" placeholder="Policy number or name" data-testid="policies-search">
+          </div>
+          <div class="field">
+            <label for="policies-status">Status</label>
+            <select class="input" id="policies-status" name="status" data-testid="policies-status">
+              <option value="">Any status</option><option value="active">Active</option><option value="pending">Pending</option>
+              <option value="lapsed">Lapsed</option><option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <fieldset class="choice-group" id="policies-products" style="align-self:center">
+            <legend>Products</legend>
+            <label class="choice"><input type="checkbox" name="product" value="auto" data-testid="policies-product-auto"><span>Auto</span></label>
+            <label class="choice"><input type="checkbox" name="product" value="home" data-testid="policies-product-home"><span>Home</span></label>
+            <label class="choice"><input type="checkbox" name="product" value="renters" data-testid="policies-product-renters"><span>Renters</span></label>
+            <label class="choice"><input type="checkbox" name="product" value="boat" data-testid="policies-product-boat"><span>Boat</span></label>
+            <label class="choice"><input type="checkbox" name="product" value="life" data-testid="policies-product-life"><span>Life</span></label>
+          </fieldset>
+          <button class="btn" id="policies-search-btn" type="submit" data-testid="policies-search-btn" data-t>Search</button>
+        </form>
+        <div class="spread" style="margin-bottom:10px">
+          <div class="row"><button class="btn btn-small" id="policies-export" type="button" disabled data-testid="policies-export" data-t>Export selected</button>
+            <span class="small muted" id="policies-selected" role="status">0 selected</span></div>
+          <a class="btn btn-small" href="/api/policies.csv" download id="policies-export-all" data-testid="policies-export-all">Export all (CSV)</a>
+        </div>
+        <div class="table-wrap" id="policies-wrap">
+          <table class="table" id="policies-table" data-testid="policies-table" aria-describedby="policies-summary">
+            <thead><tr id="policies-head">
+              <th scope="col"><input type="checkbox" id="policies-select-all" aria-label="Select all on this page" data-testid="policies-select-all"></th>
+            </tr></thead>
+            <tbody id="policies-tbody"></tbody>
+          </table>
+          <div class="table-loading" id="policies-loading" role="status" hidden><span><span class="spinner"></span> Loading policies…</span></div>
+        </div>
+        <div class="pager">
+          <span class="small muted" id="policies-summary" role="status" data-testid="policies-summary"></span>
+          <nav class="row" id="policies-pager" aria-label="Pages"></nav>
+          <label class="row small" for="policies-size">Rows per page
+            <select class="input" id="policies-size" data-testid="policies-size" style="width:auto"><option>5</option><option selected>10</option><option>25</option></select></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================================================== interactions -->
+    <section class="page" id="page-interactions" aria-labelledby="interactions-title" hidden>
+      <div class="page-head">
+        <h1 id="interactions-title">Interactions</h1>
+        <p class="lead">Mouse, keyboard, dialogs, windows, frames and shadow DOM. Every result is written on the page
+          and to the activity log.</p>
+      </div>
+      <div class="grid-cards">
+        <div class="card">
+          <h2>Mouse</h2>
+          <div class="grid">
+            <div class="row"><button class="btn btn-primary" id="ix-click" type="button" data-testid="ix-click">Click me</button>
+              <span>Clicks: <strong id="ix-click-count" data-testid="ix-click-count">0</strong></span></div>
+            <div class="target" id="ix-dblclick" tabindex="0" data-testid="ix-dblclick">Double-click this box</div>
+            <div class="target" id="ix-context" tabindex="0" aria-haspopup="menu" data-testid="ix-context">Right-click this box</div>
+            <div class="row">
+              <span class="tooltip-host" id="ix-tooltip-host">
+                <button class="btn" id="ix-hover" type="button" aria-describedby="ix-tooltip" data-testid="ix-hover">Hover for a tip</button>
+                <span class="tooltip" id="ix-tooltip" role="tooltip" hidden>Claims are answered within 2 business days</span>
+              </span>
+              <div class="hover-menu" id="ix-hover-menu">
+                <button class="btn" id="ix-hover-menu-btn" type="button" aria-haspopup="menu" data-testid="ix-hover-menu-btn">Services ▾</button>
+                <ul class="menu hover-menu-list" id="ix-hover-menu-list" role="menu" aria-label="Services">
+                  <li role="none"><button class="menu-item" role="menuitem" type="button" data-testid="ix-service-roadside">Roadside help</button></li>
+                  <li role="none"><button class="menu-item" role="menuitem" type="button" data-testid="ix-service-glass">Glass repair</button></li>
+                  <li role="none"><button class="menu-item" role="menuitem" type="button" data-testid="ix-service-agent">Find an agent</button></li>
+                </ul>
+              </div>
+            </div>
+            <div class="output" id="ix-mouse-output" role="status" data-testid="ix-mouse-output">Nothing yet.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Keyboard</h2>
+          <p class="card-sub">Focus the box and press keys. Try <kbd>Ctrl</kbd>+<kbd>S</kbd> or <kbd>Shift</kbd>+<kbd>Enter</kbd>.</p>
+          <div class="key-log" id="ix-keys" tabindex="0" role="log" aria-label="Key presses" data-testid="ix-keys"></div>
+          <div class="output" id="ix-shortcut" role="status" style="margin-top:8px" data-testid="ix-shortcut">No shortcut yet.</div>
+          <div class="field" style="margin-top:10px">
+            <label for="ix-type">Type here (Enter submits)</label>
+            <input class="input" id="ix-type" type="text" data-testid="ix-type">
+          </div>
+          <div class="output" id="ix-typed" role="status" style="margin-top:8px" data-testid="ix-typed"></div>
+        </div>
+        <div class="card">
+          <h2>Dialogs</h2>
+          <p class="card-sub">Native browser dialogs and a custom modal.</p>
+          <div class="row">
+            <button class="btn" id="ix-alert" type="button" data-testid="ix-alert">Show alert</button>
+            <button class="btn" id="ix-confirm" type="button" data-testid="ix-confirm">Show confirm</button>
+            <button class="btn" id="ix-prompt" type="button" data-testid="ix-prompt">Show prompt</button>
+            <button class="btn btn-primary" id="ix-modal-open" type="button" aria-haspopup="dialog" data-testid="ix-modal-open" data-t>Open dialog</button>
+          </div>
+          <div class="output" id="ix-dialog-output" role="status" style="margin-top:10px" data-testid="ix-dialog-output">No dialog yet.</div>
+        </div>
+        <div class="card">
+          <h2>Windows &amp; tabs</h2>
+          <div class="row">
+            <a class="btn" id="ix-new-tab" href="/static/receipt.html?ref=RCPT-2026-0042" target="_blank" rel="noopener" data-testid="ix-new-tab">Open receipt in a new tab</a>
+            <button class="btn" id="ix-popup" type="button" data-testid="ix-popup">Open popup window</button>
+          </div>
+          <div class="output" id="ix-window-output" role="status" style="margin-top:10px" data-testid="ix-window-output">The receipt opens in another tab; the popup reports back here.</div>
+        </div>
+        <div class="card">
+          <h2>Payment widget (iframe)</h2>
+          <p class="card-sub">A form inside an <code>&lt;iframe&gt;</code>. Use test card <code>4242 4242 4242 4242</code>.</p>
+          <iframe class="frame" id="ix-payment-frame" name="payment" title="Payment widget" data-testid="ix-payment-frame"></iframe>
+          <div class="output" id="ix-payment-output" role="status" style="margin-top:8px" data-testid="ix-payment-output">Waiting for payment…</div>
+        </div>
+        <div class="card">
+          <h2>Coverage card (shadow DOM)</h2>
+          <p class="card-sub">A web component; its controls live inside an open shadow root.</p>
+          <hm-coverage-card id="ix-shadow-card" data-testid="ix-shadow-card"></hm-coverage-card>
+          <div class="output" id="ix-shadow-output" role="status" style="margin-top:8px" data-testid="ix-shadow-output">No coverage added.</div>
+        </div>
+        <div class="card">
+          <h2>Tabs, accordion, rich text</h2>
+          <div class="tabs" role="tablist" aria-label="Policy documents" id="ix-tabs">
+            <button class="tab" role="tab" id="ix-tab-summary" aria-selected="true" aria-controls="ix-panel-summary" type="button">Summary</button>
+            <button class="tab" role="tab" id="ix-tab-terms" aria-selected="false" aria-controls="ix-panel-terms" tabindex="-1" type="button">Terms</button>
+            <button class="tab" role="tab" id="ix-tab-faq" aria-selected="false" aria-controls="ix-panel-faq" tabindex="-1" type="button">FAQ</button>
+          </div>
+          <div role="tabpanel" id="ix-panel-summary" aria-labelledby="ix-tab-summary">Your auto policy covers collision, theft and liability.</div>
+          <div role="tabpanel" id="ix-panel-terms" aria-labelledby="ix-tab-terms" hidden>Coverage renews every 12 months unless cancelled in writing.</div>
+          <div role="tabpanel" id="ix-panel-faq" aria-labelledby="ix-tab-faq" hidden class="accordion">
+            <details id="ix-faq-1"><summary>How do I file a claim?</summary>Use <a href="#/claim">File a claim</a>; it takes about five minutes.</details>
+            <details id="ix-faq-2"><summary>When is my bill due?</summary>On the same day each month as your start date.</details>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <span class="field-label" id="ix-editable-label">Note to your agent (rich text)</span>
+            <div class="editable" id="ix-editable" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="ix-editable-label" data-testid="ix-editable"></div>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="ix-color">Card colour</label>
+            <input id="ix-color" type="color" value="#26357f" data-testid="ix-color">
+          </div>
+        </div>
+        <div class="card">
+          <h2>Scrolling</h2>
+          <p class="card-sub">The button is below the fold inside a scrolling box.</p>
+          <div class="scroll-box" id="ix-scroll-box" data-testid="ix-scroll-box">
+            <div class="scroll-spacer">Keep scrolling…</div>
+            <button class="btn btn-primary" id="ix-hidden-button" type="button" data-testid="ix-hidden-button">You found me</button>
+          </div>
+          <div class="output" id="ix-scroll-output" role="status" style="margin-top:8px">Not found yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================================================== dynamic -->
+    <section class="page" id="page-dynamic" aria-labelledby="dynamic-title" hidden>
+      <div class="page-head">
+        <h1 id="dynamic-title">Waits &amp; dynamic content</h1>
+        <p class="lead">Elements that arrive late, leave early, change, or are replaced. Good scripts wait for a state,
+          never for a fixed time.</p>
+      </div>
+      <div class="grid-cards">
+        <div class="card">
+          <h2>Late element</h2>
+          <p class="card-sub">The agent appears about 2.5 seconds after the click.</p>
+          <button class="btn btn-primary" id="dyn-load-agent" type="button" data-testid="dyn-load-agent" data-t>Load agent</button>
+          <div id="dyn-agent-area" style="margin-top:10px" aria-live="polite"></div>
+        </div>
+        <div class="card">
+          <h2>Enabled after a countdown</h2>
+          <p class="card-sub">The button stays disabled for 5 seconds after you start.</p>
+          <div class="row"><button class="btn" id="dyn-countdown-start" type="button" data-testid="dyn-countdown-start">Start</button>
+            <button class="btn btn-primary" id="dyn-accept" type="button" disabled data-testid="dyn-accept">Accept terms</button></div>
+          <div class="output" id="dyn-countdown" role="status" style="margin-top:8px" data-testid="dyn-countdown">Not started.</div>
+        </div>
+        <div class="card">
+          <h2>Disappearing notice</h2>
+          <p class="card-sub">The notice removes itself after 4 seconds.</p>
+          <button class="btn" id="dyn-show-notice" type="button" data-testid="dyn-show-notice">Show notice</button>
+          <div id="dyn-notice-area" style="margin-top:10px"></div>
+        </div>
+        <div class="card">
+          <h2>Changing status</h2>
+          <p class="card-sub">Queued → Processing → Approved, about a second apart.</p>
+          <button class="btn" id="dyn-status-start" type="button" data-testid="dyn-status-start">Process claim</button>
+          <div class="output" style="margin-top:8px">Status: <strong id="dyn-status" role="status" data-testid="dyn-status">Idle</strong></div>
+        </div>
+        <div class="card">
+          <h2>Progress</h2>
+          <div class="row"><button class="btn" id="dyn-progress-start" type="button" data-testid="dyn-progress-start">Start download</button>
+            <span class="small" id="dyn-progress-label" role="status" data-testid="dyn-progress-label">0%</span></div>
+          <div class="progress" id="dyn-progress" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="margin-top:10px"><div class="progress-bar" id="dyn-progress-bar"></div></div>
+        </div>
+        <div class="card">
+          <h2>Toasts</h2>
+          <p class="card-sub">Toasts close themselves after 4 seconds, or with ×.</p>
+          <div class="row"><button class="btn" id="dyn-toast-ok" type="button" data-testid="dyn-toast-ok">Success toast</button>
+            <button class="btn" id="dyn-toast-err" type="button" data-testid="dyn-toast-err">Error toast</button></div>
+        </div>
+        <div class="card">
+          <h2>Random delay</h2>
+          <p class="card-sub">Today's rate arrives after 1 to 4 seconds; the wait is different every time.</p>
+          <button class="btn" id="dyn-rate" type="button" data-testid="dyn-rate">Fetch today's rate</button>
+          <div class="output" id="dyn-rate-output" role="status" style="margin-top:8px" data-testid="dyn-rate-output"></div>
+        </div>
+        <div class="card">
+          <h2>Re-rendered list (stale elements)</h2>
+          <p class="card-sub">Refresh replaces every row with new nodes; a held element reference goes stale.</p>
+          <div class="row"><button class="btn" id="dyn-rerender" type="button" data-testid="dyn-rerender">Refresh list</button>
+            <span class="small muted" id="dyn-render-count" role="status">Render 1</span></div>
+          <ul class="file-list" id="dyn-rerender-list" aria-label="Open tasks"></ul>
+        </div>
+        <div class="card">
+          <h2>Slow server call</h2>
+          <p class="card-sub">Waits for a real 3-second response from <code>/api/slow</code>.</p>
+          <button class="btn" id="dyn-slow" type="button" data-testid="dyn-slow">Call slow API</button>
+          <div class="output" id="dyn-slow-output" role="status" style="margin-top:8px" data-testid="dyn-slow-output"></div>
+        </div>
+        <div class="card">
+          <h2>Infinite scroll</h2>
+          <p class="card-sub">Scroll the list to load 10 more notices at a time, 60 in all.</p>
+          <div class="feed" id="dyn-feed" tabindex="0" aria-label="Member notices" data-testid="dyn-feed"></div>
+          <div class="small muted" id="dyn-feed-status" role="status" style="margin-top:6px" data-testid="dyn-feed-status"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================================================== activity -->
+    <section class="page" id="page-activity" aria-labelledby="activity-title" hidden>
+      <div class="page-head">
+        <h1 id="activity-title">Activity log</h1>
+        <p class="lead">What happened, as recorded by the server: <strong>server</strong> rows are real changes (quotes,
+          claims, uploads, board moves); <strong>page</strong> rows are interactions the page reported.</p>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <div class="field">
+            <label for="activity-filter">Show</label>
+            <select class="input" id="activity-filter" data-testid="activity-filter">
+              <option value="">Everything</option><option value="server">Server changes</option><option value="page">Page events</option>
+            </select>
+          </div>
+          <label class="choice"><input type="checkbox" id="activity-live" checked data-testid="activity-live"><span>Live (every 2 s)</span></label>
+          <button class="btn" id="activity-refresh" type="button" data-testid="activity-refresh">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table" id="activity-table" data-testid="activity-table">
+            <thead><tr><th scope="col" class="num">#</th><th scope="col">Time (UTC)</th><th scope="col">Source</th><th scope="col">Kind</th><th scope="col">What happened</th></tr></thead>
+            <tbody id="activity-tbody"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="activity-empty" style="margin-top:8px">Nothing recorded yet.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-relevant="additions"></div>
+
+<div class="backdrop" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-body" id="modal-dialog" data-testid="modal">
+    <h2 id="modal-title">Dialog</h2>
+    <div id="modal-body"></div>
+    <div class="dialog-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<ul class="menu context-menu" id="context-menu" role="menu" aria-label="Claim actions" hidden data-testid="context-menu">
+  <li role="none"><button class="menu-item" role="menuitem" type="button" id="context-copy">Copy claim number</button></li>
+  <li role="none"><button class="menu-item" role="menuitem" type="button" id="context-flag">Flag for review</button></li>
+  <li role="none"><button class="menu-item" role="menuitem" type="button" id="context-archive">Archive</button></li>
+</ul>
+
+<script src="/static/release.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

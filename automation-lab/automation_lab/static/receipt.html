@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-boot>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment receipt · Harbor Mutual</title>
+<style>html[data-boot] body { visibility: hidden; }</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2326357f%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22%23f08a1c%22 font-family=%22sans-serif%22 font-weight=%22700%22%3EHM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/lab.css">
+</head>
+<body>
+<main class="content" style="max-width:560px;margin:0 auto">
+  <div class="card" id="receipt-card" data-testid="receipt-card">
+    <div class="spread" style="margin-bottom:12px">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">⚓</span>Harbor Mutual</a>
+      <span class="status-pill status-active">Paid</span>
+    </div>
+    <h1 id="receipt-title">Payment receipt</h1>
+    <dl class="kv" style="margin-top:12px">
+      <dt>Receipt</dt><dd class="mono" id="receipt-ref" data-testid="receipt-ref"></dd>
+      <dt>Policy</dt><dd>POL-1001 · Auto</dd>
+      <dt>Policyholder</dt><dd>Shan Mercer</dd>
+      <dt>Amount</dt><dd id="receipt-amount" data-testid="receipt-amount">$86.40</dd>
+      <dt>Paid on</dt><dd>2026-11-03</dd>
+    </dl>
+    <div class="row" style="margin-top:16px">
+      <button class="btn" id="receipt-print" type="button" data-testid="receipt-print">Print</button>
+      <button class="btn btn-primary" id="receipt-confirm" type="button" hidden data-testid="receipt-confirm">Confirm and close</button>
+    </div>
+  </div>
+</main>
+<script src="/static/release.js"></script>
+<script>
+(function () {
+  "use strict";
+  const { R, $ } = window.HM;
+  const params = new URLSearchParams(location.search);
+  R.init(params.get("release") || "v1");
+  R.apply(document);
+  document.documentElement.removeAttribute("data-boot");
+  const ref = (params.get("ref") || "RCPT-2026-0001").replace(/[^A-Z0-9-]/gi, "").slice(0, 40);
+  $("receipt-ref").textContent = ref;
+  document.title = ref + " · Harbor Mutual";
+  $("receipt-print").addEventListener("click", () => window.print());
+  if (params.get("popup") && window.opener) {
+    $("receipt-confirm").hidden = false;
+    $("receipt-confirm").addEventListener("click", () => {
+      window.opener.postMessage({ type: "receipt-confirmed", ref }, location.origin);
+      window.close();
+    });
+  }
+})();
+</script>
+</body>
+</html>

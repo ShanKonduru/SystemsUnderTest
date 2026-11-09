@@ -7,12 +7,19 @@ These apps used to live in TruAssure's `SUT/` folder (their history came along).
 it tests them black-box, over HTTP, like any client's agent.
 
 - **Images:** on every push to `main` that passes CI, this repository publishes `ghcr.io/shankonduru/harbor-claims-agent`,
-  `harbor-member-desk` and `harbor-chat-assistant`, tagged `sha-<commit>` and `latest`. TruAssure's offline pilot tests
+  `harbor-member-desk`, `harbor-chat-assistant` and `harbor-automation-lab`, tagged `sha-<commit>` and `latest`. TruAssure's offline pilot tests
   pin a `sha-` tag and run those images with a scripted model (no LLM).
 - **Live demos:** TruAssure's `scripts/truassure-ops.*` deploy these apps from a clone of this repository next to
   TruAssure's (or wherever `TA_SUT_DIR` points), with TruAssure's `.env`. The observed deployments
   (`docker-compose.observed.yml`) put TruAssure's recording proxy in front of an app's tools; the scripts build that
   image (`truassure/proxy:dev`) from TruAssure's source first.
+
+| App | What it is | Local URL |
+|---|---|---|
+| [`chat-assistant`](chat-assistant) | Customer chat assistant (login, MCP tools, LLM) | http://127.0.0.1:8000 |
+| [`claims-agent`](claims-agent) | Event-driven back-office claims agent (no UI) | http://127.0.0.1:8100 |
+| [`multi-agent-desk`](multi-agent-desk) | Triage, billing and claims agents with identity propagation | http://127.0.0.1:8300 |
+| [`automation-lab`](automation-lab) | Web UI for test-script generation, execution and self-healing (no login, no LLM) | http://127.0.0.1:8400 |
 
 ## Configure the LLM once
 

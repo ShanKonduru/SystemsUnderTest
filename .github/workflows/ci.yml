@@ -101,11 +101,31 @@ jobs:
       - name: docker images build
         run: docker compose build
 
+  sut-automation-lab:
+    name: automation lab
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: automation-lab
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: install
+        run: python -m pip install -r requirements.txt pytest pytest-cov httpx ruff
+      - name: lint
+        run: ruff check automation_lab tests
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov
+      - name: docker image builds
+        run: docker compose build
+
   # After every app's tests pass on main: publish the images TruAssure's pilot tests run (black-box, over HTTP).
   # Tags: sha-<commit> (what TruAssure pins) and latest.
   publish-images:
     name: publish images
-    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-multi-agent-desk]
+    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-multi-agent-desk, sut-automation-lab]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -119,7 +139,7 @@ jobs:
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           TAG="sha-${GITHUB_SHA::7}"
-          for app in claims-agent:harbor-claims-agent multi-agent-desk:harbor-member-desk chat-assistant:harbor-chat-assistant; do
+          for app in claims-agent:harbor-claims-agent multi-agent-desk:harbor-member-desk chat-assistant:harbor-chat-assistant automation-lab:harbor-automation-lab; do
             dir="${app%%:*}"; name="${app##*:}"; ref="ghcr.io/$OWNER/$name"
             docker build -f "$dir/Dockerfile" \
               --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \

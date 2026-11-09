@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-boot>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbor Mutual payment</title>
+<style>html[data-boot] body { visibility: hidden; }</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2326357f%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22%23f08a1c%22 font-family=%22sans-serif%22 font-weight=%22700%22%3EHM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/lab.css">
+<style>
+  body { background: var(--panel); padding: 14px; }
+  .pay-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .pay-amount { font-weight: 700; color: var(--brand); }
+  .pay-fields { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .pay-wide { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<form class="form" id="pay-form" novalidate data-testid="pay-form" aria-labelledby="pay-title">
+  <div class="pay-head"><strong id="pay-title">Pay your premium</strong><span class="pay-amount" id="pay-amount">$86.40</span></div>
+  <div class="pay-fields">
+    <div class="field pay-wide" id="pay-field-name">
+      <label for="pay-name">Name on card</label>
+      <input class="input" id="pay-name" name="card_name" autocomplete="cc-name" required data-testid="pay-name">
+    </div>
+    <div class="field pay-wide" id="pay-field-number">
+      <label for="pay-number">Card number</label>
+      <input class="input" id="pay-number" name="card_number" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" maxlength="19" required data-testid="pay-number">
+    </div>
+    <div class="field" id="pay-field-expiry">
+      <label for="pay-expiry">Expiry (MM/YY)</label>
+      <input class="input" id="pay-expiry" name="card_expiry" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5" required data-testid="pay-expiry">
+    </div>
+    <div class="field" id="pay-field-cvc">
+      <label for="pay-cvc">Security code</label>
+      <input class="input" id="pay-cvc" name="card_cvc" inputmode="numeric" autocomplete="cc-csc" maxlength="4" required data-testid="pay-cvc">
+    </div>
+  </div>
+  <p class="field-error" id="pay-error" role="alert"></p>
+  <button class="btn btn-primary" id="pay-submit" type="submit" data-testid="pay-submit" data-t>Pay now</button>
+  <div class="notice" id="pay-result" role="status" hidden data-testid="pay-result"></div>
+</form>
+<script src="/static/release.js"></script>
+<script>
+(function () {
+  "use strict";
+  // Test cards only: 4242 4242 4242 4242 is authorized, 4000 0000 0000 0002 is declined. Nothing is charged.
+  const { R, $ } = window.HM;
+  R.init(new URLSearchParams(location.search).get("release") || "v1");
+  R.apply(document);
+  document.documentElement.removeAttribute("data-boot");
+  const AMOUNT = 86.40;
+  const digits = (s) => s.replace(/\D/g, "");
+  $("pay-number").addEventListener("input", (e) => { e.target.value = digits(e.target.value).slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 "); });
+  $("pay-expiry").addEventListener("input", (e) => { const d = digits(e.target.value).slice(0, 4); e.target.value = d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d; });
+  $("pay-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const number = digits($("pay-number").value), exp = $("pay-expiry").value, cvc = digits($("pay-cvc").value);
+    let err = "";
+    if (!$("pay-name").value.trim()) err = "Enter the name on the card.";
+    else if (number.length !== 16) err = "Enter a 16-digit card number.";
+    else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(exp) || ("20" + exp.slice(3) + exp.slice(0, 2)) < "202611") err = "Enter an expiry date in the future (MM/YY).";
+    else if (cvc.length < 3) err = "Enter the 3 or 4-digit security code.";
+    $("pay-error").textContent = err;
+    if (err) return;
+    $("pay-submit").disabled = true;
+    $("pay-submit").textContent = "Processing…";
+    await new Promise((r) => setTimeout(r, 1200));
+    const result = $("pay-result");
+    result.hidden = false;
+    if (number === "4000000000000002") {
+      result.textContent = "Your card was declined. Try another card.";
+      parent.postMessage({ type: "payment", status: "declined", reason: "card_declined", last4: number.slice(-4) }, location.origin);
+      $("pay-submit").disabled = false;
+      $("pay-submit").textContent = R.text("Pay now");
+      return;
+    }
+    const auth = "AUTH-" + number.slice(-4) + "-" + String(Date.now()).slice(-5);
+    result.textContent = `Payment authorized. Reference ${auth}.`;
+    $("pay-submit").textContent = "Paid";
+    parent.postMessage({ type: "payment", status: "authorized", auth, last4: number.slice(-4), amount: AMOUNT }, location.origin);
+  });
+})();
+</script>
+</body>
+</html>

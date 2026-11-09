@@ -1,0 +1,7 @@
+# Runtime dependencies of the automation lab. It needs no LLM, so unlike the other apps it doesn't install
+# common/harbor_llm.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9   # file uploads (multipart/form-data)
+pydantic>=2.7
+python-dotenv>=1.0
