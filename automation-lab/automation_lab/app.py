@@ -2,10 +2,13 @@
 
     uvicorn automation_lab.app:app --port 8400        # http://127.0.0.1:8400   (no login)
 
-Page:  GET /  (?release=v1|v2|v3 overrides the default UI release for that page load)
+Page:  GET /  (?release=v1|v2|v3|v4 overrides the default UI release for that page load; ?drift=N renames ids,
+       names and classes every N seconds while the page is open, 0 = off)
 
 API (JSON; validation errors are 422 {"detail", "errors": {field: message}}):
-  GET    /api/config                      release, releases, today, upload limit, page-side defects
+  GET    /api/config                      release, releases, rules, drift_seconds, today, upload limit, page defects
+  GET    /api/locator-map?release=v2      every authored element's id, name, testid, tag, role, accessible name and
+                                          text in that release: the ground truth for scoring heals
   GET    /api/policies                    ?q=&status=&product=a,b&sort=&dir=asc|desc&page=1&size=10
   GET    /api/policies/{number}
   GET    /api/policies.csv                ?ids=POL-1001,POL-1002 (all when omitted); a file download
@@ -20,6 +23,7 @@ API (JSON; validation errors are 422 {"detail", "errors": {field: message}}):
 
 Test control (header X-Sandbox-Token = LAB_SANDBOX_TOKEN; with no token set every request is refused):
   GET  /sandbox/status      POST /sandbox/reset      POST /sandbox/release {"release": "v2"}
+  POST /sandbox/drift {"seconds": 10}   (0 = off; 2-300)
 """
 
 from __future__ import annotations
@@ -37,9 +41,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from automation_lab import __version__
-from automation_lab.config import RELEASES, Settings
+from automation_lab.config import RELEASES, Settings, drift_seconds
 from automation_lab.defects import UI_DEFECTS
 from automation_lab.domain import PRODUCTS, price_quote, validate_claim, validate_quote
+from automation_lab.locators import locator_map
+from automation_lab.locators import rules as release_rules
 from automation_lab.store import Store
 
 STATIC = Path(__file__).parent / "static"
@@ -78,10 +84,14 @@ class ReleaseBody(BaseModel):
     release: str
 
 
+class DriftBody(BaseModel):
+    seconds: int
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     store = Store(settings.db_path, settings.uploads_dir, settings.today)
-    state = {"release": settings.release}
+    state: dict[str, Any] = {"release": settings.release, "drift": settings.drift_seconds}
     app = FastAPI(title="Harbor Mutual Automation Lab", version=__version__)
     app.state.settings, app.state.store = settings, store
 
@@ -102,18 +112,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:
-        return {"status": "ok", "app": "automation-lab", "version": __version__, "release": state["release"]}
+        return {"status": "ok", "app": "automation-lab", "version": __version__, "release": state["release"],
+                "drift_seconds": state["drift"]}
 
     @app.get("/api/config")
     async def config() -> dict[str, Any]:
         return {
             "release": state["release"],
             "releases": RELEASES,
+            "rules": release_rules(),
+            "drift_seconds": state["drift"],
             "today": settings.today.isoformat(),
             "max_upload_bytes": settings.max_upload_bytes,
             "upload_types": sorted(ALLOWED_TYPES),
             "ui_defects": sorted(settings.defects & UI_DEFECTS),
         }
+
+    @app.get("/api/locator-map")
+    async def get_locator_map(release: str = "") -> dict[str, Any]:
+        try:
+            return locator_map(release or state["release"])
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     # ------------------------------------------------------------------ policies
     @app.get("/api/policies")
@@ -292,13 +312,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def sandbox_status(request: Request) -> dict[str, Any]:
         require_sandbox(request)
         return {"sandbox": True, "today": settings.today.isoformat(), "release": state["release"],
-                "defects": sorted(settings.defects), "counts": store.counts()}
+                "drift_seconds": state["drift"], "defects": sorted(settings.defects), "counts": store.counts()}
 
     @app.post("/sandbox/reset")
     async def sandbox_reset(request: Request) -> dict[str, str]:
         require_sandbox(request)
         store.reset()
-        state["release"] = settings.release
+        state["release"], state["drift"] = settings.release, settings.drift_seconds
         return {"status": "reset", "release": state["release"]}
 
     @app.post("/sandbox/release")
@@ -309,6 +329,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         state["release"] = body.release
         store.log("server", "release", f"Default UI release switched to {body.release}", {"release": body.release})
         return {"status": "ok", "release": body.release}
+
+    @app.post("/sandbox/drift")
+    async def sandbox_drift(request: Request, body: DriftBody) -> dict[str, Any]:
+        require_sandbox(request)
+        try:
+            state["drift"] = drift_seconds(body.seconds)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        summary = f"Live drift every {state['drift']} s" if state["drift"] else "Live drift switched off"
+        store.log("server", "drift", summary, {"seconds": state["drift"]})
+        return {"status": "ok", "drift_seconds": state["drift"]}
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

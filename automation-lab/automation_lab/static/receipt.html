@@ -31,11 +31,11 @@
 </main>
 <script src="/static/release.js"></script>
 <script>
-(function () {
+(async function () {
   "use strict";
-  const { R, $ } = window.HM;
+  const { R, $, loadRules } = window.HM;
   const params = new URLSearchParams(location.search);
-  R.init(params.get("release") || "v1");
+  R.init(params.get("release") || "v1", await loadRules());
   R.apply(document);
   document.documentElement.removeAttribute("data-boot");
   const ref = (params.get("ref") || "RCPT-2026-0001").replace(/[^A-Z0-9-]/gi, "").slice(0, 40);

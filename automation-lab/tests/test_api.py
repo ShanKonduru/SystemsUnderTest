@@ -12,11 +12,12 @@ def test_page_health_and_config(client: TestClient) -> None:
     page = client.get("/")
     assert page.status_code == 200 and "Harbor Mutual Automation Lab" in page.text
     assert page.headers["cache-control"] == "no-store"
-    for asset in ("lab.css", "release.js", "app.js", "receipt.html", "frames/payment.html"):
+    for asset in ("lab.css", "release.js", "releases.json", "app.js", "receipt.html", "frames/payment.html"):
         assert client.get("/static/" + asset).status_code == 200
-    assert client.get("/healthz").json() == {"status": "ok", "app": "automation-lab", "version": "0.1.0", "release": "v1"}
+    assert client.get("/healthz").json() == {"status": "ok", "app": "automation-lab", "version": "0.1.0", "release": "v1",
+                                           "drift_seconds": 0}
     cfg = client.get("/api/config").json()
-    assert cfg["release"] == "v1" and set(cfg["releases"]) == {"v1", "v2", "v3"}
+    assert cfg["release"] == "v1" and set(cfg["releases"]) == {"v1", "v2", "v3", "v4"}
     assert cfg["today"] == "2026-11-03" and cfg["ui_defects"] == [] and ".pdf" in cfg["upload_types"]
 
 

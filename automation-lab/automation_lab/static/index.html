@@ -25,6 +25,7 @@
       <option value="v1">v1 · Baseline</option>
       <option value="v2">v2 · Redesign</option>
       <option value="v3">v3 · Dynamic</option>
+      <option value="v4">v4 · Structural</option>
     </select>
   </label>
   <a class="activity-link" id="activity-link" href="#/activity">Activity <span class="badge" id="activity-count" aria-label="activity events">0</span></a>
@@ -73,18 +74,22 @@
       <div class="card" style="margin-top:16px">
         <h2>UI releases (for self-healing)</h2>
         <p class="muted">Pick a release in the header, or open the page with <code>?release=v2</code>. Behaviour and
-          data are identical; only locators change. Record on v1, replay on v2 and v3, and watch which locators survive.</p>
+          data are identical; only locators change. Record on v1, replay on v2, v3 and v4, and watch which locators
+          survive. v2 suits design-time healing (repair the script once); v3 and v4 suit run-time healing. Add
+          <code>?drift=10</code> to rename elements every 10 seconds while the page is open. The ground truth for
+          scoring heals is at <a href="/api/locator-map?release=v2">/api/locator-map</a>.</p>
         <div class="table-wrap">
           <table class="table" id="release-table">
-            <thead><tr><th scope="col">Locator</th><th scope="col">v1 Baseline</th><th scope="col">v2 Redesign</th><th scope="col">v3 Dynamic</th></tr></thead>
+            <thead><tr><th scope="col">Locator</th><th scope="col">v1 Baseline</th><th scope="col">v2 Redesign</th><th scope="col">v3 Dynamic</th><th scope="col">v4 Structural</th></tr></thead>
             <tbody>
-              <tr><td>id</td><td><code>quote-first-name</code></td><td><code>hmQuoteFirstName</code></td><td>random per load</td></tr>
-              <tr><td>name</td><td><code>first_name</code></td><td><code>firstName</code></td><td>random per load</td></tr>
-              <tr><td>class</td><td><code>btn-primary</code></td><td><code>ui-btn-primary</code></td><td>random per load</td></tr>
-              <tr><td>data-testid</td><td><code>quote-submit</code></td><td><code>quote-submit</code></td><td>removed</td></tr>
-              <tr><td>Button text</td><td>Get my quote</td><td>Calculate premium</td><td>Calculate premium</td></tr>
-              <tr><td>Absolute XPath</td><td>as authored</td><td>extra wrappers, swapped fields</td><td>extra wrappers, swapped fields</td></tr>
-              <tr><td>Label / role / accessible name</td><td colspan="3">unchanged in every release</td></tr>
+              <tr><td>id</td><td><code>quote-first-name</code></td><td><code>hmQuoteFirstName</code></td><td>random per load</td><td>random per load</td></tr>
+              <tr><td>name</td><td><code>first_name</code></td><td><code>firstName</code></td><td>random per load</td><td>random per load</td></tr>
+              <tr><td>class</td><td><code>btn-primary</code></td><td><code>ui-btn-primary</code></td><td>random per load</td><td>random per load</td></tr>
+              <tr><td>data-testid</td><td><code>quote-submit</code></td><td><code>quote-submit</code></td><td>removed</td><td>removed</td></tr>
+              <tr><td>Button text</td><td>Get my quote</td><td>Calculate premium</td><td>Calculate premium</td><td>See my price</td></tr>
+              <tr><td>Absolute XPath</td><td>as authored</td><td>extra wrappers, swapped fields</td><td>extra wrappers, swapped fields</td><td>as v3, one more swap</td></tr>
+              <tr><td>Label / accessible name</td><td><code>First name</code></td><td>unchanged</td><td>unchanged</td><td><code>Given name</code></td></tr>
+              <tr><td>Element type / role</td><td>button</td><td>unchanged</td><td>unchanged</td><td>some buttons become links or <code>div role=button</code></td></tr>
             </tbody>
           </table>
         </div>

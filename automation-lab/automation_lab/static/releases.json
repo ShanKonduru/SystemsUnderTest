@@ -1,0 +1,62 @@
+{
+  "_comment": "UI release rules, the single source for the page (release.js, via /api/config) and the server's /api/locator-map. Keys of the maps are the authored (v1) words or ids.",
+  "releases": ["v1", "v2", "v3", "v4"],
+  "schemes": {"v1": "authored", "v2": "renamed", "v3": "random", "v4": "random"},
+  "testid": {"v1": true, "v2": true, "v3": false, "v4": false},
+  "wrap_fields": {"v1": false, "v2": true, "v3": true, "v4": true},
+  "swaps": {
+    "v2": [["quote-field-email", "quote-field-phone"], ["quote-field-first-name", "quote-field-last-name"], ["claim-field-incident-type", "claim-field-incident-date"], ["docs-card-input", "docs-card-dropzone"]],
+    "v3": [["quote-field-email", "quote-field-phone"], ["quote-field-first-name", "quote-field-last-name"], ["claim-field-incident-type", "claim-field-incident-date"], ["docs-card-input", "docs-card-dropzone"]],
+    "v4": [["quote-field-email", "quote-field-phone"], ["quote-field-first-name", "quote-field-last-name"], ["claim-field-incident-type", "claim-field-incident-date"], ["docs-card-input", "docs-card-dropzone"], ["claim-field-location", "claim-field-incident-time"]]
+  },
+  "text": {
+    "v2": {
+      "Get my quote": "Calculate premium", "Start over": "Clear form", "Next": "Continue", "Back": "Previous",
+      "Submit claim": "File my claim", "Upload": "Upload files", "Browse files": "Select files", "Choose a photo": "Pick an image",
+      "Export selected": "Download selected", "Search": "Find", "Open dialog": "Show dialog", "Load agent": "Find my agent",
+      "Pay now": "Authorize payment", "Add coverage": "Include coverage", "File another claim": "Start a new claim"
+    },
+    "v3": {
+      "Get my quote": "Calculate premium", "Start over": "Clear form", "Next": "Continue", "Back": "Previous",
+      "Submit claim": "File my claim", "Upload": "Upload files", "Browse files": "Select files", "Choose a photo": "Pick an image",
+      "Export selected": "Download selected", "Search": "Find", "Open dialog": "Show dialog", "Load agent": "Find my agent",
+      "Pay now": "Authorize payment", "Add coverage": "Include coverage", "File another claim": "Start a new claim"
+    },
+    "v4": {
+      "Get my quote": "See my price", "Start over": "Reset form", "Next": "Next step", "Back": "Go back",
+      "Submit claim": "Send my claim", "Upload": "Send files", "Browse files": "Pick files", "Choose a photo": "Add a photo",
+      "Export selected": "Export checked rows", "Search": "Look up", "Open dialog": "Edit preferred name", "Load agent": "Show my agent",
+      "Pay now": "Pay $86.40", "Add coverage": "Add to policy", "File another claim": "New claim"
+    }
+  },
+  "placeholder": {
+    "v2": {"Policy number or name": "Search policies…", "you@example.com": "name@email.com", "Start typing a make…": "Vehicle make"},
+    "v3": {"Policy number or name": "Search policies…", "you@example.com": "name@email.com", "Start typing a make…": "Vehicle make"},
+    "v4": {"Policy number or name": "Number or policyholder", "you@example.com": "you@domain.com", "Start typing a make…": "e.g. Toyota"}
+  },
+  "labels": {
+    "v4": {
+      "Product": "Insurance product", "Coverage start date": "Policy start date", "Coverage level": "Level of cover",
+      "Deductible": "Excess", "Add-ons": "Extras", "First name": "Given name", "Last name": "Family name",
+      "Date of birth": "Birth date", "Email": "Email address", "ZIP code": "Postal code", "Payment plan": "Billing frequency",
+      "Policy number": "Policy no.", "What happened?": "Type of incident", "Date of incident": "Incident date",
+      "Where did it happen?": "Incident location", "Describe what happened": "Tell us what happened",
+      "Estimated damage (USD)": "Damage estimate (USD)", "Files": "Documents", "Category": "Document type",
+      "Search": "Find policies", "Status": "Policy status", "Name on card": "Cardholder name", "Card number": "Card no.",
+      "Security code": "CVC", "Coverage to add": "Cover option", "Type here (Enter submits)": "Message (press Enter)"
+    }
+  },
+  "aria_labels": {
+    "v4": {
+      "Coverage limit": "Limit of cover", "Signature pad": "Sign here", "Drop files here, or press Enter to browse": "File drop area",
+      "Member notices": "Notices feed", "Key presses": "Keyboard log", "Select all on this page": "Select every row on this page",
+      "Upload progress": "Upload status"
+    }
+  },
+  "elements": {
+    "v4": {
+      "ix-click": "link", "ix-popup": "link", "dyn-load-agent": "link", "docs-refresh": "link", "claim-again": "link",
+      "claim-next": "div-button", "signature-clear": "div-button", "dyn-rerender": "div-button"
+    }
+  }
+}

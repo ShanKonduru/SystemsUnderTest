@@ -1074,9 +1074,12 @@
     if (activity.busy) return;
     activity.busy = true;
     try {
-      const rows = await api("/api/activity?after=" + activity.last);
-      activity.rows.push(...rows);
-      if (rows.length) activity.last = rows[rows.length - 1].seq;
+      let rows;
+      do {   // the API returns up to 200 rows a call: read until caught up
+        rows = await api("/api/activity?after=" + activity.last);
+        activity.rows.push(...rows);
+        if (rows.length) activity.last = rows[rows.length - 1].seq;
+      } while (rows.length >= 200);
       $("activity-count").textContent = String(activity.rows.length);
       if (current === "activity") renderActivity();
     } catch (err) { /* the badge just stays as it is */ }
@@ -1106,10 +1109,27 @@
     const link = document.querySelector('link[rel="stylesheet"]');
     if (link && !link.sheet) await new Promise((r) => { link.addEventListener("load", r, { once: true }); link.addEventListener("error", r, { once: true }); });
   }
+  /* Live drift: every `seconds`, rename every id, name and class again (the payment frame too) and drop data-testid. */
+  function startDrift(seconds) {
+    const html = document.documentElement;
+    html.setAttribute("data-drift-seconds", String(seconds));
+    html.setAttribute("data-drift-generation", "0");
+    setInterval(() => {
+      const generation = R.driftNow();
+      try {
+        const frame = $("ix-payment-frame").contentWindow;
+        if (frame && frame.HM) frame.HM.R.driftNow();
+      } catch (e) { /* frame not loaded yet */ }
+      html.setAttribute("data-drift-generation", String(generation));
+      window.dispatchEvent(new CustomEvent("hm:drift", { detail: { generation } }));
+      track("drift", `Locators renamed while the page was open (generation ${generation})`, { generation, seconds });
+    }, seconds * 1000);
+  }
+
   async function boot() {
     try { CFG = { ...CFG, ...(await api("/api/config")) }; } catch (e) { /* defaults */ }
-    const asked = new URLSearchParams(location.search).get("release");
-    R.init(asked || CFG.release);
+    const params = new URLSearchParams(location.search);
+    R.init(params.get("release") || CFG.release, CFG.rules);
     await stylesReady();
     R.apply(document);
     document.documentElement.setAttribute("data-release", R.name);
@@ -1119,11 +1139,16 @@
     const sel = $("release-select");
     sel.value = R.name;
     sel.addEventListener("change", () => { const u = new URL(location.href); u.searchParams.set("release", sel.value); location.href = u.toString(); });
-    if (R.name !== "v1") {
+    // ?drift=N (seconds; 0 = off) wins over the server default; values are kept within 2-300
+    const askedDrift = params.has("drift") ? Number(params.get("drift")) || 0 : Number(CFG.drift_seconds) || 0;
+    const drift = askedDrift > 0 ? Math.min(300, Math.max(2, Math.round(askedDrift))) : 0;
+    if (R.name !== "v1" || drift) {
       const banner = $("release-banner");
       banner.hidden = false;
-      banner.textContent = `UI release ${R.name} — ${CFG.releases[R.name] || ""}`;
+      banner.textContent = [R.name !== "v1" ? `UI release ${R.name} — ${CFG.releases[R.name] || ""}` : "",
+        drift ? `Live drift: ids, names and classes change every ${drift} s while this page is open` : ""].filter(Boolean).join(" · ");
     }
+    if (drift) startDrift(drift);
     $("nav-toggle").addEventListener("click", () => {
       const open = $("sidenav").classList.toggle(C("sidenav-open"));
       $("nav-toggle").setAttribute("aria-expanded", open ? "true" : "false");

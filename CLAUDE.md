@@ -86,12 +86,15 @@ Two interchangeable engines, `CLAIMS_ENGINE=loop|langgraph` (`graph.py`), must s
 narrowed to the receiving role — never widened. Tool server verifies tokens and writes `audit_log`.
 
 **automation-lab.** FastAPI (`app.py`, `create_app(settings)`) serving a no-build static page (`static/`). The page is
-authored once as UI release v1; `static/release.js` rewrites ids/names/classes/texts/layout at load for v2/v3
-(`?release=` or `LAB_RELEASE`, `POST /sandbox/release`) so recorded locators break and self-healing can be shown. App
+authored once as UI release v1; `static/release.js` rewrites ids/names/classes/texts/labels/element types at load
+for v2/v3/v4 (`?release=` or `LAB_RELEASE`, `POST /sandbox/release`) and again every N s under live drift
+(`?drift=N`, `LAB_DRIFT_SECONDS`, `POST /sandbox/drift`), so recorded locators break and self-healing can be shown.
+The per-release rules live in `static/releases.json`, read by both the page (via `/api/config`) and `locators.py`,
+which serves `/api/locator-map` (ground truth for scoring heals) — change rules there, never in only one place. App
 JS must reach elements via `HM.$(authoredId)`, create them via `HM.h()`, use `HM.C()` for classes, and CSS must never
 select by id or `data-testid` — otherwise v2/v3 break. A pytest checks every literal `$("id")` in `app.js` exists in
 `index.html`. Hidden pages stay in the DOM, so browser scripts must scope to the visible page region.
-`e2e/smoke.py` (Playwright, not in CI) drives every area in all three releases.
+`e2e/smoke.py` (Playwright, not in CI) drives every area in v1–v3 and checks the locator map, v4 and drift.
 
 **Planted defects.** `CLAIMS_DEFECTS` / `DESK_DEFECTS` / `LAB_DEFECTS` (comma-separated; see `defects.py` in each app) switch on
 deliberate bugs so TruAssure can prove it catches them. Unknown names are errors. They must stay off by default

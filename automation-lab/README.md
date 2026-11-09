@@ -30,35 +30,60 @@ The port is bound to `127.0.0.1` only. Data (`lab.db`, `uploads/`) is in `automa
 | Setting (root `.env`) | Default | Purpose |
 |---|---|---|
 | `LAB_PORT` | `8400` | Port on 127.0.0.1 |
-| `LAB_RELEASE` | `v1` | UI release served when the URL doesn't ask for one |
+| `LAB_RELEASE` | `v1` | UI release served when the URL doesn't ask for one (v1–v4) |
 | `LAB_TODAY` | `2026-11-03` | Fixed "today", so dates and validation are reproducible |
 | `LAB_LATENCY_MS` | `300` | Network wait added to the policies table and the notices feed |
 | `LAB_MAX_UPLOAD_MB` | `5` | Upload size limit |
-| `LAB_SANDBOX_TOKEN` | (empty) | Token for `/sandbox/status`, `/sandbox/reset` and `/sandbox/release`. When empty, all three refuse every request |
+| `LAB_DRIFT_SECONDS` | `0` | Rename ids, names and classes every N seconds while a page is open (0 = off, else 2–300) |
+| `LAB_SANDBOX_TOKEN` | (empty) | Token for `/sandbox/status`, `/sandbox/reset`, `/sandbox/release` and `/sandbox/drift`. When empty, all of them refuse every request |
 | `LAB_DEFECTS` | (empty) | **Test runs only.** A "buggy build": comma-separated planted defects (below) |
 
-## UI releases: self-healing
+## UI releases, live drift and the locator map: self-healing
 
-The page is written once and rewritten at load time for the selected release (`static/release.js`). Behaviour and
-data are identical in every release; only the locators change. Record a script on v1, replay it on v2 and v3, and
-see which locators survive.
+The lab doesn't heal anything itself. It is the website whose locators break, so your framework's healing can be
+shown and scored. The page is written once and rewritten at load time for the selected release
+(`static/release.js`, using the rules in `static/releases.json`). Behaviour and data are identical in every release;
+only the locators change.
 
-| Locator | v1 Baseline | v2 Redesign | v3 Dynamic |
-|---|---|---|---|
-| `id` | `quote-first-name` | `hmQuoteFirstName` | random on every load |
-| `name` | `first_name` | `firstName` | random on every load |
-| `class` | `btn-primary` | `ui-btn-primary` | random on every load |
-| `data-testid` | kept | kept | removed |
-| Button text | Get my quote | Calculate premium | Calculate premium |
-| Layout | as written | some fields swapped, every field wrapped in an extra `<div>` | as v2 |
-| Label, role, accessible name | stable | stable | stable |
+| Locator | v1 Baseline | v2 Redesign | v3 Dynamic | v4 Structural |
+|---|---|---|---|---|
+| `id` | `quote-first-name` | `hmQuoteFirstName` | random on every load | random on every load |
+| `name` | `first_name` | `firstName` | random on every load | random on every load |
+| `class` | `btn-primary` | `ui-btn-primary` | random on every load | random on every load |
+| `data-testid` | kept | kept | removed | removed |
+| Button text | Get my quote | Calculate premium | Calculate premium | See my price |
+| Placeholder | you@example.com | name@email.com | name@email.com | you@domain.com |
+| Layout | as written | 4 pairs of fields swapped, every field wrapped in an extra `<div>` | as v2 | as v2, plus Location ↔ Approximate time |
+| Label, ARIA name | First name | stable | stable | reworded: Given name, Policy no., Limit of cover… |
+| Element type | `<button>` | stable | stable | 5 buttons become links, 3 become `<div role="button">` |
 
-Choose a release in the header, open the page with `?release=v2`, or switch the default for everyone with
-`POST /sandbox/release {"release": "v2"}`. The payment iframe and the receipt page follow the same release.
+| Kind of healing | Use | Why |
+|---|---|---|
+| Design-time (repair the saved script once) | **v2** | Renames are fixed, so a repaired locator keeps working on every load |
+| Run-time (find the element live, script unchanged) | **v3** | Ids, names and classes change on every load; only live matching gets through |
+| Run-time, hardest | **v4** | Labels, ARIA names, button texts and element types change too |
+| Run-time, mid-session | **`?drift=N`** | Renames every id, name and class again every N seconds while the page is open |
 
-[`e2e/smoke.py`](e2e/smoke.py) drives every area in all three releases with one script, using only release-proof
-locators: labels, roles and names scoped to the visible page region. Pages that aren't shown stay in the DOM
-(hidden), so an unscoped `get_by_label("Email")` also matches the claim wizard's "Email" radio button.
+- **Choosing a release:** the header's **UI release** select, `?release=v1|v2|v3|v4` for one page load, or
+  `POST /sandbox/release {"release": "v4"}` (or `LAB_RELEASE`) as the default. The payment iframe and the popup
+  follow the page's release; the new-tab receipt link always opens v1.
+- **Live drift:** `?drift=N` (2–300 s; `0` = off) wins for that load; `POST /sandbox/drift {"seconds": 10}` (or
+  `LAB_DRIFT_SECONDS`) sets the default. Each drift renames the page, its shadow DOM and the payment iframe, drops
+  every `data-testid`, sets `<html data-drift-generation="N">`, fires a `hm:drift` window event and logs a `drift`
+  activity. Behaviour and styling are unaffected.
+- **Swapped fields trap position-based healing.** First name ↔ Last name and Email ↔ Phone swap places in v2–v4.
+  A wrong heal still "passes" on screen; `GET /api/quotes` shows the values in the wrong fields.
+- **Scoring heals:** `GET /api/locator-map?release=v2` lists every authored element (key = its v1 id) with its id,
+  CSS selector, name, `data-testid`, tag, role, accessible name, placeholder and text in that release. v1 and v2 are
+  exact; v3 and v4 ids are random per load (`"dynamic": true`), and `window.HM.R.locatorMap()` in the page returns
+  this load's values (also after drift). The map is ground truth for scoring; a framework under test must not use it
+  to heal.
+
+[`e2e/smoke.py`](e2e/smoke.py) drives every area in v1, v2 and v3 with one script using only release-proof locators
+(labels, roles and names scoped to the visible page region), then checks the locator map against the rendered page in
+all four releases, completes v4 flows using names taken from the map, and runs a quote while drift renames the page.
+Pages that aren't shown stay in the DOM (hidden), so an unscoped `get_by_label("Email")` also matches the claim
+wizard's "Email" radio button.
 
 ```bat
 automation-lab\.venv\Scripts\python -m pip install playwright
@@ -69,7 +94,7 @@ automation-lab\.venv\Scripts\python automation-lab\e2e\smoke.py
 ## Checking what a script did
 
 - The API answers what the page shows: `GET /api/quotes`, `/api/claims`, `/api/uploads`, `/api/board`,
-  `/api/activity`. The header comment of `automation_lab/app.py` has the full list.
+  `/api/activity` (up to 200 rows a call; page with `?after=<last seq>`). The header comment of `automation_lab/app.py` has the full list.
 - Reference numbers are deterministic from a clean start: quotes `Q-2026-0001`…, claims `CLM-9001`…, uploads `UPL-0001`….
 - Seed data includes 57 policies (`POL-1001` Shan Mercer is active, `POL-1002` has lapsed, `POL-1004` is cancelled)
   and 10 claims on the board.
@@ -100,7 +125,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\uvicorn automation_lab.app:app --reload --port 8400
 ```
 
-There are 38 offline tests at 99% coverage, with a 95% gate. The page is plain HTML, CSS and JavaScript, with no
+There are 47 offline tests at 99% coverage, with a 95% gate. The page is plain HTML, CSS and JavaScript, with no
 build step. In `static/app.js`, reach elements through `HM.$("authored-id")` and create them with `HM.h()`. Use
 `HM.C()` for class names. Style only by class, element or ARIA attribute, never by id or `data-testid`. Otherwise
 v2 and v3 break.

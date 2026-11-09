@@ -197,7 +197,11 @@ with sync_playwright() as p:
             tab.value.close()
             with ctx.expect_page() as pop:
                 page.get_by_role("button", name="Open popup window").click()
-            pop.value.get_by_role("button", name="Confirm and close").click()
+            try:   # the popup closes itself as the click lands
+                pop.value.get_by_role("button", name="Confirm and close").click(no_wait_after=True)
+            except Exception as e:
+                if "closed" not in str(e):
+                    raise
             expect(page.get_by_text("Popup confirmed receipt RCPT-POPUP-01")).to_be_visible()
             page.get_by_role("tab", name="Terms").click()
             expect(page.get_by_text("Coverage renews every 12 months")).to_be_visible()
@@ -233,6 +237,92 @@ with sync_playwright() as p:
             fails.append(f"{release}: console/page errors: {errors[:5]}")
             print("  console errors:", errors[:5])
         ctx.close()
+
+    # ------------------------------------------------------------ healing features: locator map, v4, live drift
+    if not sys.argv[1:]:
+        release = "healing"
+        print("== healing features")
+        ctx = browser.new_context(viewport={"width": 1366, "height": 900})
+        page = ctx.new_page()
+
+        def map_of(rel):
+            return {e["key"]: e for e in page.request.get(f"{BASE}/api/locator-map?release={rel}").json()["elements"]}
+
+        def map_matches_dom():
+            for rel in ("v1", "v2", "v3", "v4"):
+                page.goto(f"{BASE}/?release={rel}#/quote"); page.wait_for_load_state("networkidle")
+                for key, e in map_of(rel).items():
+                    if e["page"] == "payment-frame":
+                        continue
+                    live = page.evaluate("k => window.HM.R.locatorMap().elements[k]", key)
+                    assert live, f"{rel}: {key} missing from the page"
+                    assert live["tag"] == e["tag"], f"{rel}: {key} tag {live['tag']} != {e['tag']}"
+                    if e["id"]:
+                        assert page.locator(f"#{e['id']}").count() == 1, f"{rel}: #{e['id']} not found"
+                    else:
+                        assert live["id"] and live["id"] != key, f"{rel}: {key} kept its authored id"
+                    assert live["testid"] == e["testid"], f"{rel}: {key} testid {live['testid']} != {e['testid']}"
+                    if e["page"] == "quote" and e["role"] in {"textbox", "button", "combobox", "checkbox", "radio", "slider", "switch"} and e["accessible_name"]:
+                        found = page.get_by_role(e["role"], name=e["accessible_name"], exact=True, include_hidden=True).count()
+                        assert found >= 1, f"{rel}: role={e['role']} name={e['accessible_name']!r} ({key}) not found"
+        check("locator map matches the rendered page in v1-v4", map_matches_dom)
+
+        def v4_heals_with_map():
+            names = map_of("v4")
+            page.goto(f"{BASE}/?release=v4#/quote"); page.wait_for_load_state("networkidle")
+            q = page.get_by_role("region", name="Get a quote")
+            assert q.get_by_label("First name", exact=True).count() == 0, "v1 label still present in v4"
+            label = lambda k: q.get_by_label(names[k]["accessible_name"], exact=True)  # noqa: E731
+            label("quote-product").select_option("home")
+            label("quote-start-date").fill("2026-11-20")
+            label("quote-first-name").fill("Indu"); label("quote-last-name").fill("Varma")
+            label("quote-dob").fill("1985-02-14"); label("quote-email").fill("indu@example.com")
+            label("quote-zip").fill("02108"); label("quote-consent").check()
+            q.get_by_role("button", name=names["quote-submit"]["text"]).click()
+            expect(page.get_by_text(re.compile(r"^Q-2026-\d{4}$"))).to_be_visible(timeout=5000)
+            page.goto(f"{BASE}/?release=v4#/interactions")
+            assert page.get_by_role("button", name="Click me").count() == 0
+            page.get_by_role("link", name="Click me").click()
+            expect(page.get_by_text(re.compile(r"^Clicked \d+ times?$"))).to_be_visible()
+            page.goto(f"{BASE}/?release=v4#/claim")
+            c = page.get_by_role("region", name="File a claim")
+            c.get_by_label("Policy no.").fill("POL-1001")
+            expect(c.get_by_text("Policyholder: Shan Mercer", exact=False)).to_be_visible()
+            c.get_by_label("Type of incident").select_option("theft")
+            c.get_by_label("Incident date").fill("2026-10-30")
+            c.get_by_label("Incident location").fill("Main St")
+            c.get_by_role("button", name="Next step").click()        # a <div role="button"> in v4
+            expect(c.get_by_role("heading", name=re.compile("Step 2 of 4"))).to_be_visible()
+        check("v4 renames labels and element types; the map heals a script", v4_heals_with_map)
+
+        def live_drift():
+            page.goto(f"{BASE}/?release=v2&drift=2#/quote"); page.wait_for_load_state("networkidle")
+            first = lambda: page.evaluate("window.HM.R.locatorMap().elements['quote-first-name'].id")  # noqa: E731
+            assert first() == "hmQuoteFirstName", "drifted before the first check"
+            expect(page.locator("html")).to_have_attribute("data-drift-generation", "1", timeout=5000)
+            after = first()
+            assert after != "hmQuoteFirstName" and page.locator("#hmQuoteFirstName").count() == 0
+            assert page.locator("[data-testid]").count() == 0
+            expect(page.locator("html")).to_have_attribute("data-drift-generation", "2", timeout=5000)
+            assert first() != after, "the second drift did not rename again"
+            q = page.get_by_role("region", name="Get a quote")
+            q.get_by_label("Product").select_option("auto")
+            q.get_by_label("Coverage start date").fill("2026-11-20")
+            q.get_by_label("First name").fill("Shan"); q.get_by_label("Last name").fill("Mercer")
+            q.get_by_label("Date of birth").fill("1990-05-01"); q.get_by_label("Email", exact=True).fill("shan@example.com")
+            q.get_by_label("ZIP code").fill("02110"); q.get_by_label(re.compile("I agree that Harbor Mutual")).check()
+            btn = q.get_by_role("button", name="Calculate premium")
+            bg = btn.evaluate("e => getComputedStyle(e).backgroundColor")
+            assert bg in ("rgb(38, 53, 127)", "rgb(143, 160, 255)"), f"styles lost after drift: {bg}"
+            btn.click()
+            expect(page.get_by_text(re.compile(r"^Q-2026-\d{4}$"))).to_be_visible(timeout=5000)
+            kinds, after = [], 0
+            while rows := page.request.get(f"{BASE}/api/activity?after={after}").json():   # 200 rows per call
+                kinds += [a["kind"] for a in rows]; after = rows[-1]["seq"]
+            assert "drift" in kinds, "no drift activity recorded"
+        check("live drift renames while the page is open; behaviour and styles survive", live_drift)
+        ctx.close()
+
     # phone width: no horizontal scroll
     ctx = browser.new_context(viewport={"width": 390, "height": 844})
     page = ctx.new_page()

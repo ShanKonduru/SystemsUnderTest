@@ -42,11 +42,11 @@
 </form>
 <script src="/static/release.js"></script>
 <script>
-(function () {
+(async function () {
   "use strict";
   // Test cards only: 4242 4242 4242 4242 is authorized, 4000 0000 0000 0002 is declined. Nothing is charged.
-  const { R, $ } = window.HM;
-  R.init(new URLSearchParams(location.search).get("release") || "v1");
+  const { R, $, loadRules } = window.HM;
+  R.init(new URLSearchParams(location.search).get("release") || "v1", await loadRules());
   R.apply(document);
   document.documentElement.removeAttribute("data-boot");
   const AMOUNT = 86.40;

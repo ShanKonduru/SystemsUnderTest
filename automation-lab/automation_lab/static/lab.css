@@ -64,7 +64,8 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 
 .btn { cursor: pointer; text-decoration: none; color: var(--ink); display: inline-block; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
 .btn:hover { border-color: var(--brand); }
-.btn:disabled { opacity: .5; cursor: not-allowed; border-color: var(--line); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; border-color: var(--line); }
+.btn[aria-disabled="true"] { pointer-events: none; }
 .btn-primary, .btn-primary:visited { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn-danger { color: var(--err); }

@@ -29,6 +29,8 @@ RELEASES: dict[str, str] = {
     "data-testid kept",
     "v3": "Dynamic: ids, names and classes regenerated on every page load and no data-testid; only labels, roles "
     "and visible text are stable",
+    "v4": "Structural: v3 plus reworded labels, ARIA names and button texts, one more swap, and some buttons turned "
+    "into links or div role=button; only the page structure and what each control does stay the same",
 }
 
 
@@ -44,12 +46,22 @@ def _release() -> str:
     return value
 
 
+def drift_seconds(value: object) -> int:
+    """Live drift interval: 0 (off) or 2-300 seconds."""
+    seconds = int(str(value).strip() or 0)
+    if seconds != 0 and not 2 <= seconds <= 300:
+        raise ValueError(f"drift must be 0 (off) or 2-300 seconds, not {seconds}")
+    return seconds
+
+
 @dataclass
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("LAB_DATA") or PROJECT_ROOT / "data"))
     today: date = field(default_factory=_today)
     # the release served when the page's URL doesn't ask for one (?release=v2); /sandbox/release changes it live
     release: str = field(default_factory=_release)
+    # rename ids, names and classes every N seconds while a page is open (0 = off); ?drift=N and /sandbox/drift too
+    drift_seconds: int = field(default_factory=lambda: drift_seconds(os.environ.get("LAB_DRIFT_SECONDS", "0")))
     sandbox_token: str = field(default_factory=lambda: os.environ.get("LAB_SANDBOX_TOKEN", ""))
     max_upload_bytes: int = field(
         default_factory=lambda: int(float(os.environ.get("LAB_MAX_UPLOAD_MB", "5")) * 1024 * 1024)

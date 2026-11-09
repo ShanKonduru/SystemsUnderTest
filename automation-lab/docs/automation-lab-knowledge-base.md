@@ -20,7 +20,7 @@ Every area of the lab exercises a different kind of control that a generated scr
 
 ```mermaid
 flowchart LR
-    S["Test script<br/>Playwright, Selenium<br/>or your generator"] -->|drives UI| P["Lab page<br/>index.html, app.js<br/>release.js: v1 v2 v3"]
+    S["Test script<br/>Playwright, Selenium<br/>or your generator"] -->|drives UI| P["Lab page<br/>index.html, app.js<br/>release.js: v1 v2 v3 v4"]
     P -->|JSON API| A["Lab server<br/>FastAPI, port 8400<br/>/api and /sandbox"]
     A -->|reads, writes| D["System of record<br/>lab.db (SQLite)<br/>uploads/ folder"]
     S -->|reset, switch release, verify outcome| A
@@ -34,7 +34,7 @@ A script drives the page in a browser; the page talks only to the lab server's J
 2. Open http://127.0.0.1:8400. Add `?release=v2` or `?release=v3` for the changed UI releases.
 3. Stop with `docker compose -f automation-lab/docker-compose.yml down`. Data stays in `automation-lab/data/`.
 
-For local development: create a Python 3.12 virtual environment in `automation-lab/`, install `requirements.txt` plus `pytest pytest-cov httpx ruff`, then run `uvicorn automation_lab.app:app --reload --port 8400`. The offline test suite is `python -m pytest -q --cov` (38 tests, 95% coverage gate).
+For local development: create a Python 3.12 virtual environment in `automation-lab/`, install `requirements.txt` plus `pytest pytest-cov httpx ruff`, then run `uvicorn automation_lab.app:app --reload --port 8400`. The offline test suite is `python -m pytest -q --cov` (47 tests, 95% coverage gate).
 
 ## Shell and navigation
 
@@ -43,8 +43,8 @@ The lab is a single-page app: one header, a left navigation and nine pages switc
 | Element | Behaviour |
 | --- | --- |
 | Brand link | "Harbor Mutual" with an orange "Automation Lab" tag; goes to `#/overview`. |
-| UI release picker | A select labelled "UI release" with v1 Baseline, v2 Redesign and v3 Dynamic. Changing it reloads the page with `?release=<value>`, keeping the current hash. |
-| Release banner | On v2 and v3 an orange banner under the header names the release and what it changes. Hidden on v1. |
+| UI release picker | A select labelled "UI release" with v1 Baseline, v2 Redesign, v3 Dynamic and v4 Structural. Changing it reloads the page with `?release=<value>`, keeping the current hash. |
+| Release banner | On v2, v3 and v4 an orange banner under the header names the release and what it changes; with live drift on it also says how often elements are renamed. Hidden on v1 without drift. |
 | Activity link and badge | "Activity" with an orange count of activity events known to the page; goes to `#/activity`. The count refreshes after every recorded action. |
 | Left navigation | Groups: Workflows (Get a quote, File a claim), Controls (Documents & uploads, Drag & drop, Policies table, Interactions, Waits & dynamic content), Results (Activity log). The current page's link has `aria-current="page"`. |
 | Page title | The browser tab reads "\<Page name> · Harbor Mutual Automation Lab". |
@@ -408,42 +408,72 @@ Page controls:
 
 Reference numbers are deterministic from a clean start (`POST /sandbox/reset`): the first quote is Q-2026-0001, the first claim CLM-9001, the first upload UPL-0001, and activity starts at 1. Rejected files do not consume an upload number; the `upload_drops_last` defect does.
 
-## UI releases and self-healing
+## UI releases, live drift and the locator map (self-healing)
 
-The lab renders the same page in three UI releases; behaviour and data never change, only locators do. A script recorded on v1 and replayed on v2 or v3 breaks wherever it relied on what changed, which is what a self-healing framework must repair.
+The lab does not heal anything itself: it is the website whose locators break, so a framework's healing can be shown and scored. The same page renders in four UI releases, can rename itself while open (live drift), and publishes the ground truth of what every element is called (the locator map). Behaviour, data and messages never change.
 
-| Locator | v1 Baseline | v2 Redesign | v3 Dynamic |
-| --- | --- | --- | --- |
-| `id` | As authored, e.g. `quote-first-name` | "hm" + PascalCase: `hmQuoteFirstName` | `_` + 7 random characters, new on every load |
-| `name` | `first_name` | camelCase: `firstName` | `f` + 6 random characters, new on every load |
-| `class` | `btn-primary` | `ui-` prefix: `ui-btn-primary` | `css-` + 6 random characters, new on every load |
-| `data-testid` | Present on key controls | Unchanged | Removed |
-| Button texts | As authored | Reworded (list below) | As v2 |
-| Placeholders | As authored | Reworded (list below) | As v2 |
-| Field order | As authored | Four pairs swapped (below) | As v2 |
-| DOM depth | As authored | Every form field wrapped in an extra `div` (absolute XPaths break; layout does not) | As v2 |
-| Labels, roles, accessible names, headings, other visible text | Stable in every release | Stable | Stable |
+| Locator | v1 Baseline | v2 Redesign | v3 Dynamic | v4 Structural |
+| --- | --- | --- | --- | --- |
+| `id` | As authored, e.g. `quote-first-name` | "hm" + PascalCase: `hmQuoteFirstName` | `_` + 7 random characters, new on every load | As v3 |
+| `name` | `first_name` | camelCase: `firstName` | `f` + 6 random characters per load | As v3 |
+| `class` | `btn-primary` | `ui-btn-primary` | `css-` + 6 random characters per load | As v3 |
+| `data-testid` | Present on key controls | Unchanged | Removed | Removed |
+| Button texts | As authored | Reworded (list 1) | As v2 | Reworded differently (list 2) |
+| Placeholders | As authored | Reworded | As v2 | Reworded differently |
+| Field order | As authored | Four pairs swapped | As v2 | As v2, plus Where did it happen? ↔ Approximate time |
+| DOM depth | As authored | Every form field wrapped in an extra `div` | As v2 | As v2 |
+| Labels and ARIA names | As authored | Unchanged | Unchanged | Reworded (list 3) |
+| Element types | As authored | Unchanged | Unchanged | 5 buttons become links, 3 become `<div role="button">` |
+| Headings and other visible text | Stable | Stable | Stable | Stable |
 
-Reworded buttons (v2 and v3): Get my quote → Calculate premium; Start over → Clear form; Next → Continue; Back → Previous; Submit claim → File my claim; Upload → Upload files; Browse files → Select files; Choose a photo → Pick an image; Export selected → Download selected; Search → Find; Open dialog → Show dialog; Load agent → Find my agent; Pay now → Authorize payment; Add coverage → Include coverage; File another claim → Start a new claim.
+1. **v2/v3 buttons:** Get my quote → Calculate premium; Start over → Clear form; Next → Continue; Back → Previous; Submit claim → File my claim; Upload → Upload files; Browse files → Select files; Choose a photo → Pick an image; Export selected → Download selected; Search → Find; Open dialog → Show dialog; Load agent → Find my agent; Pay now → Authorize payment; Add coverage → Include coverage; File another claim → Start a new claim. Placeholders: "Policy number or name" → "Search policies…"; "you@example.com" → "name@email.com"; "Start typing a make…" → "Vehicle make".
+2. **v4 buttons:** Get my quote → See my price; Start over → Reset form; Next → Next step; Back → Go back; Submit claim → Send my claim; Upload → Send files; Browse files → Pick files; Choose a photo → Add a photo; Export selected → Export checked rows; Search → Look up; Open dialog → Edit preferred name; Load agent → Show my agent; Pay now → Pay $86.40; Add coverage → Add to policy; File another claim → New claim. Placeholders: "Number or policyholder", "you@domain.com", "e.g. Toyota".
+3. **v4 labels:** Product → Insurance product; Coverage start date → Policy start date; Coverage level → Level of cover; Deductible → Excess; Add-ons → Extras; First name → Given name; Last name → Family name; Date of birth → Birth date; Email → Email address (the claim contact radio too); ZIP code → Postal code; Payment plan → Billing frequency; Policy number → Policy no.; What happened? → Type of incident; Date of incident → Incident date; Where did it happen? → Incident location; Describe what happened → Tell us what happened; Estimated damage (USD) → Damage estimate (USD); Files → Documents; Category → Document type; Search (policies) → Find policies; Status → Policy status; Name on card → Cardholder name; Card number → Card no.; Security code → CVC; Coverage to add → Cover option; Type here (Enter submits) → Message (press Enter). ARIA names: Coverage limit → Limit of cover; Signature pad → Sign here; the documents drop zone → File drop area; Member notices → Notices feed; Key presses → Keyboard log; Select all on this page → Select every row on this page; Upload progress → Upload status.
 
-Reworded placeholders: "Policy number or name" → "Search policies…"; "you@example.com" → "name@email.com"; "Start typing a make…" → "Vehicle make".
+v4 element types: **Click me**, **Open popup window**, **Load agent**, **Refresh** (documents) and **File another claim** become links; **Next** (claim), **Clear** (signature) and **Refresh list** become `<div role="button" tabindex="0">`. They still click, respond to Enter and Space, and honour disabled (shown as `aria-disabled="true"`).
 
-Swapped pairs: Email ↔ Phone and First name ↔ Last name on the quote form; What happened? ↔ Date of incident on claim step 1; the Standard file input card ↔ the Drag & drop zone card on Documents.
+### Which release for which kind of healing
+
+| Kind of healing | Use | Why |
+| --- | --- | --- |
+| Design-time: the tool repairs the saved script once | v2 | Renames are fixed, so a repaired locator keeps working on every later load; `data-testid` survives, so choosing it can be scored |
+| Run-time: the tool finds the element live, script unchanged | v3 | Ids, names and classes change on every load; a saved repair is wrong next time, only live matching gets through |
+| Run-time, hardest | v4 | Labels, ARIA names, button texts and element types change too; text- and role-based matching must cope with synonyms and new roles |
+| Run-time, mid-session | Live drift | Elements are renamed while the script is on the page, so a locator resolved seconds ago stops matching |
+
+Swapped fields trap position-based healing: First name ↔ Last name and Email ↔ Phone change places in v2–v4. A wrong heal still passes on screen; `GET /api/quotes` shows the values in the wrong fields.
 
 ### Choosing a release
 
-1. The header's **UI release** select reloads the page with `?release=v1|v2|v3`.
+1. The header's **UI release** select (v1 Baseline, v2 Redesign, v3 Dynamic, v4 Structural) reloads the page with `?release=<value>`, keeping the hash.
 2. A URL parameter `?release=` wins for that page load; an unknown value falls back to v1.
 3. Without a parameter the server's default applies: `LAB_RELEASE` (default v1), or the value set live with `POST /sandbox/release` (logged as a `release` activity, reset by `POST /sandbox/reset`).
 4. The payment iframe and the popup follow the page's release; the new-tab receipt link always opens the v1 receipt.
-5. `<html data-release="v2">` records the active release for scripts.
+5. On v2–v4 an orange banner names the release; `<html data-release="v4">` records it for scripts.
 
-### Locators that survive every release
+### Live drift
 
-- `getByRole('button', { name: /Get my quote|Calculate premium/ })` or a role + label pair, scoped to the visible page region.
-- `getByLabel('First name')`, `getByRole('combobox', { name: 'Vehicle make' })`, `getByRole('slider', { name: 'Coverage limit' })`.
-- Text that is not reworded, such as headings and result messages.
-- `data-testid` survives v2 but not v3; ids, names, classes and absolute XPaths survive only v1.
+- `?drift=N` renames every id, name and class again every N seconds while the page is open (N is kept within 2–300; `0` = off). Without the parameter, the server default applies: `LAB_DRIFT_SECONDS` (default 0) or `POST /sandbox/drift {"seconds": 10}`.
+- Each drift renames the page, the shadow DOM card and the payment iframe, removes every `data-testid`, rewrites the stylesheet so nothing changes visually, and keeps every control working.
+- Signals for scripts and observers: `<html data-drift-seconds="10" data-drift-generation="N">` (generation counts drifts), a `hm:drift` window event with the generation, and a page activity "Locators renamed while the page was open (generation N)" (kind `drift`).
+- The banner adds "Live drift: ids, names and classes change every N s while this page is open". Drift works on any release, v1 included (the first drift then switches it to random names).
+
+### Locator map (scoring heals)
+
+- `GET /api/locator-map?release=v2` (default: the server's current release) lists every authored element of the page and the payment iframe. Each entry has `key` (its v1 id), `page`, `tag`, `role`, `accessible_name`, `id`, `css`, `name`, `testid`, `placeholder`, `text` and `dynamic`. The response also lists the release's swaps and whether fields are wrapped.
+- v1 and v2 are exact. In v3 and v4 ids, names and classes are random per load, so they are null with `"dynamic": true`; accessible names, texts, roles and tags are still given (v4's reworded ones included).
+- For this page load's actual values, also after drift, call `window.HM.R.locatorMap()` in the page: `{release, generation, drifted, elements: {key: {id, name, testid, classes, tag, role}}}`.
+- Both are generated from the authored page and the same rules file the page uses (`static/releases.json`), so they cannot disagree with what renders. They are ground truth for scoring a framework; a framework under test must not read them to heal.
+- Unknown release → 400.
+
+### Locators that survive
+
+| Strategy | v1 | v2 | v3 | v4 | Live drift |
+| --- | --- | --- | --- | --- | --- |
+| id, name, class, absolute XPath | Yes | No | No | No | No |
+| `data-testid` | Yes | Yes | No | No | No |
+| Role + accessible name, label, button text | Yes | With v2 wording | With v2 wording | No: needs fuzzy or semantic matching | Yes, at that release's wording |
+| Headings, result messages, region names | Yes | Yes | Yes | Yes | Yes |
 
 ## API, sandbox, settings and planted defects
 
@@ -454,8 +484,8 @@ Everything the page does goes through a small JSON API, which scripts can also c
 | Method and path | Purpose | Notes |
 | --- | --- | --- |
 | GET `/` | The page | `Cache-Control: no-store` |
-| GET `/healthz` | Liveness | `{"status":"ok","app":"automation-lab","version":"0.1.0","release":"v1"}` |
-| GET `/api/config` | Page settings | release, releases, today, max\_upload\_bytes, upload\_types, ui\_defects |
+| GET `/healthz` | Liveness | `{"status":"ok","app":"automation-lab","version":"0.1.0","release":"v1","drift_seconds":0}` |
+| GET `/api/config` | Page settings | release, releases, rules (the contents of releases.json), drift\_seconds, today, max\_upload\_bytes, upload\_types, ui\_defects |
 | GET `/api/policies` | Search, filter, sort, page | `q`, `status`, `product=a,b`, `sort` (policy\_number, holder, product, status, premium, renewal\_date), `dir` (asc, desc), `page`, `size` (1–100). Bad sort or dir → 400. Returns total, page, pages, size, items |
 | GET `/api/policies/{number}` | One policy | Case-insensitive; unknown → 404 |
 | GET `/api/policies.csv` | CSV download | `ids=POL-1001,POL-1003` for a subset; logs `export` |
@@ -464,32 +494,36 @@ Everything the page does goes through a small JSON API, which scripts can also c
 | POST `/api/uploads` | Upload | multipart `files` (one or more) + `area`; 201 with uploaded and rejected |
 | GET `/api/uploads`, GET / DELETE `/api/uploads/{id}` | List, download, delete | Unknown id → 404 |
 | GET `/api/board`, PUT `/api/board/cards/{id}` | Board state / move a card | Body `{"column":"review","position":0}`; position ≥ 0 (else 422) and clamped to the lane; unknown column → 400; unknown card → 404 |
-| GET `/api/activity?after=N`, POST `/api/activity` | Read / add events | POST body kind (1–40 chars), summary (1–200), detail |
+| GET `/api/activity?after=N`, POST `/api/activity` | Read / add events | At most 200 rows a call, oldest first: page with after=\<last seq>. POST body kind (1–40 chars), summary (1–200), detail |
 | GET `/api/feed?offset=&limit=` | Notices for infinite scroll | 60 notices; limit 1–20; `next` is null at the end |
 | GET `/api/slow?ms=` | A deliberate wait | Clamped to 0–10,000 ms |
+| GET /api/locator-map?release= | Ground truth for scoring heals | Every authored element in that release (default: current); unknown release → 400. See the UI releases section |
+| GET /static/releases.json | Release rules | Schemes, text, placeholder, label and ARIA maps, swaps, wrapping and v4 element types per release |
 
 ### Sandbox (test control)
 
-All three need the header `X-Sandbox-Token` equal to `LAB_SANDBOX_TOKEN`. When the setting is empty, every call is refused with 401, so a deployment without a token cannot be reset by anyone.
+All four need the header `X-Sandbox-Token` equal to `LAB_SANDBOX_TOKEN`. When the setting is empty, every call is refused with 401, so a deployment without a token cannot be reset by anyone.
 
 | Call | Effect |
 | --- | --- |
-| GET `/sandbox/status` | today, release, defects and counts of quotes, claims, uploads, activity |
-| POST `/sandbox/reset` | Restores the seed (policies, board), deletes quotes, claims, uploads and activity, restarts numbering, returns the release to `LAB_RELEASE` |
+| GET `/sandbox/status` | today, release, drift\_seconds, defects and counts of quotes, claims, uploads, activity |
+| POST `/sandbox/reset` | Restores the seed (policies, board), deletes quotes, claims, uploads and activity, restarts numbering, returns the release to `LAB_RELEASE` and drift to LAB\_DRIFT\_SECONDS |
 | POST `/sandbox/release` | `{"release":"v2"}` sets the default release live; unknown release → 400 |
+| POST /sandbox/drift | {"seconds":10} sets the default live-drift interval for pages opened from then on; 0 switches it off; anything other than 0 or 2–300 → 400; logged as a drift activity |
 
 ### Settings (root `.env`)
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `LAB_PORT` | 8400 | Host port on 127.0.0.1 |
-| `LAB_RELEASE` | v1 | Default UI release; an unknown value stops the app at start |
+| `LAB_RELEASE` | v1 | Default UI release (v1–v4); an unknown value stops the app at start |
 | `LAB_TODAY` | 2026-11-03 | Fixed date for validation and pricing |
 | `LAB_LATENCY_MS` | 300 | Wait added to `/api/policies` and `/api/feed` |
 | `LAB_MAX_UPLOAD_MB` | 5 | Upload size limit (decimals allowed) |
 | `LAB_SANDBOX_TOKEN` | empty | Token for the sandbox calls |
 | `LAB_DEFECTS` | empty | Planted defects; an unknown name stops the app at start |
 | `LAB_DATA_DIR` | ./data | Host folder for `lab.db` and uploads |
+| LAB\_DRIFT\_SECONDS | 0 | Default live-drift interval (0 = off, else 2–300); another value stops the app at start |
 
 ### Planted defects (`LAB_DEFECTS`, test runs only)
 
@@ -507,15 +541,15 @@ Two CSV files turn this knowledge base into a requirements baseline and an autom
 
 | File (in `automation-lab/docs/`) | Content | Size |
 | --- | --- | --- |
-| `automation-lab-requirements.csv` | 44 user stories (REQ-01 to REQ-44) in 12 epics, one row per acceptance criterion in Given/When/Then form | 252 acceptance criteria |
-| `automation-lab-test-cases.csv` | Test cases traced to requirement and AC ids, with type, priority, level, preconditions, data, steps, expected result, locators, backend check, wait strategy, releases and tags | 345 test cases: 188 happy path, 55 negative, 41 edge, 61 boundary |
+| `automation-lab-requirements.csv` | 47 user stories (REQ-01 to REQ-47) in 12 epics, one row per acceptance criterion in Given/When/Then form | 277 acceptance criteria |
+| `automation-lab-test-cases.csv` | Test cases traced to requirement and AC ids, with type, priority, level, preconditions, data, steps, expected result, locators, backend check, wait strategy, releases and tags | 379 test cases: 211 happy path, 61 negative, 42 edge, 65 boundary |
 
 ### Writing scripts that survive every release
 
 1. Start each test from a known state: `POST /sandbox/reset` with `X-Sandbox-Token`, then open the page with an explicit `?release=`.
 2. Scope to the visible page: `page.getByRole('region', { name: 'Get a quote' })`. Hidden pages stay in the DOM.
 3. Prefer role + accessible name, then label, then visible text. Use a regex for reworded buttons, e.g. `/^(Next|Continue)$/`.
-4. Never use ids, names, classes or absolute XPaths if the script must run on v2 or v3; `data-testid` works on v1 and v2 only.
+4. Never use ids, names, classes or absolute XPaths if the script must run on v2–v4 or under drift; `data-testid` works on v1 and v2 only; role, label and text locators break on v4. Show design-time healing on v2, run-time healing on v3 and v4, and mid-session healing with `?drift=N`. Score each heal against `/api/locator-map` (and `window.HM.R.locatorMap()` for this load); never let the framework read them.
 5. Wait for states, not time: a text, an enabled button, a hidden toast, an `aria-busy` that clears, a network response. The longest built-in wait is 5 s (Accept terms); `slow_ui` adds 8 s on purpose.
 6. For the pointer-driven sortable list, slider and signature pad, use real mouse moves (down, several moves, up) and scroll the target into view first. The claims board uses HTML5 drag and drop.
 7. Register a dialog handler before clicking Show alert, Show confirm or Show prompt.
@@ -523,4 +557,4 @@ Two CSV files turn this knowledge base into a requirements baseline and an autom
 
 ### Reference script
 
-`automation-lab/e2e/smoke.py` drives every area in all three releases with only release-proof locators (Playwright). Run it with `LAB_BROWSER_CHANNEL=msedge` or `chrome` to use an installed browser.
+`automation-lab/e2e/smoke.py` drives every area in v1–v3 with only release-proof locators (Playwright), checks the locator map against the rendered page in all four releases, completes v4 flows using names from the map, and fills a quote while drift renames the page. Run it with `LAB_BROWSER_CHANNEL=msedge` or `chrome` to use an installed browser.
