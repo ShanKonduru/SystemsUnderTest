@@ -14,6 +14,7 @@ x-common: &common
   image: harbor-mutual/member-desk:dev
   env_file:
     - path: ${SUT_ENV_FILE:-../.env}
+      format: raw          # values used as written: a $ in a password stays a $
       required: false
   volumes:
     - ./data:/app/data          # desk.db and the signing key; readable from the host
