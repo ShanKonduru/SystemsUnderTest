@@ -28,6 +28,15 @@ with every handoff, and every tool call is verified and audited with the full ch
 - billing opens a case (or says it couldn't), and does not hand off to claims;
 - triage tells the member it couldn't get the information, and states no amounts.
 
+**Host checks around the model** ([`desk/agents.py`](desk/agents.py)), added after live runs showed each failure:
+- billing may not hand off once its own lookup failed, and is sent back if it finishes without opening a case;
+- any agent is sent back if its answer says a case was (or will be) opened when no `open_case` succeeded;
+- triage is sent back if it offers to open a case, or leaves out an amount or due date a lookup returned;
+- a specialist is sent back if it asks a question (it reports to another agent; nobody can answer).
+
+An agent is sent back at most twice. The checks stand aside under the planted `no_containment` defect, so that
+buggy build still behaves as described below.
+
 Members: `M-1001` (Shan, policy POL-1002, claim CLM-5003 paid less the deductible), `M-2201` (Indu, POL-2001,
 claim CLM-7001 denied), `M-3001` (Sri, billing only). Send the member id in `X-Principal`.
 
@@ -44,7 +53,9 @@ docker compose -f multi-agent-desk\docker-compose.yml down
 The response is triage's account of the episode:
 - `route`, `output`, `status` and `done`;
 - every `hop` (from, to, member, chain, permissions, status);
-- every `step` of every agent (tool calls and handoffs, with the identity used).
+- every `step` of every agent (tool calls and handoffs, with the identity used);
+- `cases`: the case ids `open_case` really returned (a handoff's result carries them as `cases_opened`);
+- `guards`: each time the host blocked an action or sent an agent back, with the reason.
 
 Only triage (`127.0.0.1:8300`) and the tool server (`127.0.0.1:9300`) publish ports. Billing and claims are
 reachable only inside the compose network.
@@ -94,13 +105,18 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest -q --cov
 ```
 
-There are 40 offline tests at 99.0% coverage, with a 95% gate. They cover identity signing and delegation, the
-backend's checks, every tool and fault mode, the three agents together, and an end-to-end run over HTTP with
-four local servers, including a cascading failure.
+There are 50 offline tests at 98.9% coverage, with a 95% gate. They cover identity signing and delegation, the
+backend's checks, every tool and fault mode, the three agents together, an end-to-end run over HTTP with
+four local servers, including a cascading failure, and the host checks (`tests/test_guards.py`, which replays
+each failure seen live with a misbehaving script).
 
 **Verified live with Azure OpenAI:**
 - a billing question, a billing+claims question with a two-hop chain, and a claims question for another member;
 - the cascading failure, which was contained.
 
 In the cascading-failure run, the model told the member a case had been opened, but no agent opened one. That
-false claim about actions is the kind of defect TruAssure is built to catch.
+false claim about actions is the kind of defect TruAssure is built to catch. TruAssure's live runs found it
+four times per run, along with dropped amounts and billing handing off after its lookup failed; the host checks
+above now prevent all three (45 live episodes, none of them). Two weaknesses remain live: the model may accept a
+false premise ("why was my claim lower than my bill?" when it paid more) and may call a permission refusal a
+temporary problem. The scripted model handles both, and TruAssure's desk catalog checks for them.

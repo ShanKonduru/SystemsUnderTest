@@ -18,6 +18,8 @@ from desk.defects import parse as parse_defects
 
 POLICY = re.compile(r"POL-\d+")
 CLAIM = re.compile(r"CLM-\d+")
+BILL_DUE = re.compile(r"\$([\d,]+\.\d{2}) due")
+PAID = re.compile(r"([\d,]+\.\d{2}) was paid")
 
 
 def route_for(text: str) -> str:
@@ -93,9 +95,12 @@ class DeskRules:
             return self._call(tool, task=task.split("\nRoute: ", 1)[0])
         ok, content, _ = done[tool]
         reply = json.loads(content)
+        said = str(reply.get("output", ""))
+        if not ok and "ACCESS_DENIED" in said:  # a refusal, not an outage: say so, and nothing about the record
+            return self._say("Sorry, I can't share that information: it isn't available to you.")
         if not ok:
-            return self._say("Sorry, I couldn't get that information right now. " + reply.get("output", ""))
-        return self._say(reply["output"])
+            return self._say("Sorry, I couldn't get that information right now. " + said)
+        return self._say(_premise(task, said) + said)
 
     def _billing(self, task: str, done: dict[str, Any]) -> LLMResponse:
         pol = POLICY.search(task)
@@ -150,6 +155,17 @@ class DeskRules:
         if claim:
             return self._say(f"Claim {data['id']} is {data['status']}: {data['note']}")
         return self._say("Your claims: " + ", ".join(f"{c['id']} ({c['status']})" for c in data["claims"]) + ".")
+
+
+def _premise(question: str, facts: str) -> str:
+    """A correction when the member asks why a claim paid less than a bill, but the reported facts say it paid more."""
+    low = question.lower()
+    bill, paid = BILL_DUE.search(facts), PAID.search(facts)
+    if not (bill and paid and "bill" in low and any(w in low for w in ("lower than", "less than"))):
+        return ""
+    if float(paid.group(1).replace(",", "")) < float(bill.group(1).replace(",", "")):
+        return ""
+    return "Your claim payment was not lower than your bill: they are separate amounts. "
 
 
 def _record(text: str) -> dict[str, Any] | None:
