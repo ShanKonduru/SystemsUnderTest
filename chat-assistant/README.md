@@ -4,6 +4,11 @@ A customer-facing insurance chat assistant for the fictitious insurer Harbor Mut
 through intent routing, a plan, and tool calls through an MCP tool server, against a SQLite system of record.
 Actions that change data, such as payments or policy changes, ask the customer for approval first.
 
+The app checks the model before it acts or answers, so the result doesn't depend on how a request is worded:
+- a change the backend would refuse (for example a driver under 16) is refused without an approval prompt;
+- a lookup the turn's plan calls for runs before the reply, so the answer uses current data (once per turn);
+- in a message with several requests, a request no tool touched is handled before the reply.
+
 ## Run it on Docker Desktop
 
 ```bat

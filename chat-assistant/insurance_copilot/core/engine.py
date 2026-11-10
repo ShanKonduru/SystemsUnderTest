@@ -16,9 +16,10 @@ import asyncio
 import dataclasses
 import inspect
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
+from insurance_copilot.backend.db import MIN_DRIVER_AGE, age_on
 from insurance_copilot.config import Settings
 from insurance_copilot.core.intents import ALL_INTENTS
 from insurance_copilot.core.llm import LLM, StructuredOutputError
@@ -218,6 +219,17 @@ class CopilotSession:
                           "write ONE complete reply to the customer covering everything, including what you "
                           "already said.")})
                     continue
+                # Plan check: a lookup the plan called for is run before the reply, so the answer uses current
+                # data rather than an earlier turn's (seen when a customer pressed for a quick answer).
+                skipped = self._skipped_reads(trace)
+                if skipped and not trace.plan_checks and step < self.settings.max_tool_steps:
+                    trace.plan_checks.append(skipped)
+                    await self._emit("plan_check", {"skipped_reads": skipped})
+                    self.history.append({"role": "user", "content": (
+                        "[App check - not from the customer] Your plan for this turn looks up "
+                        + ", ".join(skipped) + " but you answered without calling it. Call it now so the answer "
+                          "uses current data, then write ONE complete reply to the customer.")})
+                    continue
                 trace.reply = text
                 return
 
@@ -257,6 +269,32 @@ class CopilotSession:
         missing = [i for i in actionable if i not in touched and self.toolbox.tools_for_intents([i])]
         return missing if len(actionable) >= 2 else []
 
+    def _skipped_reads(self, trace: TurnTrace) -> list[str]:
+        """Read-only tools in scope that this turn's plan names but that never ran."""
+        if trace.plan is None:
+            return []
+        done = {c.name for c in trace.tool_calls if c.executed}
+        out: list[str] = []
+        for s in trace.plan.steps:
+            spec = self.toolbox.tools.get(s.action)
+            if (spec and spec.read_only and not spec.requires_confirmation and s.action in trace.selected_tools
+                    and s.action not in done and s.action not in out):
+                out.append(s.action)
+        return out
+
+    def _precheck(self, rec: ToolCallRecord) -> str | None:
+        """Why the backend would refuse this write, known before asking the customer to approve it; or None."""
+        if rec.name == "add_driver":
+            try:
+                dob = date.fromisoformat(str(rec.arguments.get("date_of_birth")))
+            except ValueError:
+                return None  # the backend reports a malformed date itself
+            age = age_on(dob, self.settings.today)
+            if not MIN_DRIVER_AGE <= age <= 120:
+                return (f"Drivers must be at least {MIN_DRIVER_AGE}; born {dob.isoformat()}, this driver is {age} "
+                        "today, so they can't be added.")
+        return None
+
     def _make_record(self, step: int, tool_use: Any, scope: list[str]) -> ToolCallRecord:
         spec = self.toolbox.tools.get(tool_use.name)
         # Host-only arguments (consent) are never taken from the model.
@@ -293,6 +331,10 @@ class CopilotSession:
             rec.blocked_reason, rec.is_error = "NOT_PERMITTED", True
             rec.result = (f"NOT_PERMITTED: {spec.title} is outside the signed-in user's authority, so it was not "
                           "attempted. Nothing changed. Say who can do it instead.")
+        elif spec.requires_confirmation and (problem := self._precheck(rec)) is not None:
+            # Don't ask the customer to approve something the backend would refuse.
+            rec.blocked_reason, rec.is_error = "INVALID_REQUEST", True
+            rec.result = f"INVALID_REQUEST: {problem} It was not attempted and nothing changed; tell the customer why."
         else:
             if spec.requires_confirmation:
                 request = ConfirmationRequest(tool=rec.name, title=spec.title, arguments=rec.arguments,

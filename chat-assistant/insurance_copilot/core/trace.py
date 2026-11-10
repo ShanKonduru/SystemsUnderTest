@@ -89,6 +89,7 @@ class TurnTrace:
     stop_reason: str | None = None
     clarified_early: bool = False
     completeness_checks: list[list[str]] = field(default_factory=list)  # intents the app reminded about
+    plan_checks: list[list[str]] = field(default_factory=list)  # planned reads the app had run before the reply
     error: str | None = None
 
     @property
