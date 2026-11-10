@@ -53,7 +53,7 @@ async def test_a_planned_lookup_runs_before_the_reply(settings):
     assert trace.reply.startswith("Yes: gap cover is $6.00")
     reminder = llm.create_calls[1]["messages"][-1]
     assert reminder["role"] == "user" and reminder["content"].startswith("[App check - not from the customer]")
-    assert "list_riders" in reminder["content"]
+    assert "list_riders" in reminder["content"] and "on purpose" in reminder["content"]  # a refusal may stand
 
 
 async def test_the_plan_check_asks_once_and_ignores_writes_and_tools_out_of_scope(settings):

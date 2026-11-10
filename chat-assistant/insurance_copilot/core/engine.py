@@ -227,8 +227,10 @@ class CopilotSession:
                     await self._emit("plan_check", {"skipped_reads": skipped})
                     self.history.append({"role": "user", "content": (
                         "[App check - not from the customer] Your plan for this turn looks up "
-                        + ", ".join(skipped) + " but you answered without calling it. Call it now so the answer "
-                          "uses current data, then write ONE complete reply to the customer.")})
+                        + ", ".join(skipped) + " but you answered without calling it. If your answer states facts "
+                          "that lookup returns, call it now so they are current, then write ONE complete reply. If "
+                          "you left it out on purpose (the request isn't allowed, or you must ask the customer "
+                          "something first), give the same answer again without calling it.")})
                     continue
                 trace.reply = text
                 return
