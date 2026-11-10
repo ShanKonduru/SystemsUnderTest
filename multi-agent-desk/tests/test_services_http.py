@@ -39,7 +39,9 @@ def test_tool_server_endpoints(settings):
         )
         set_ = c.post("/sandbox/faults", json={"faults": {"get_billing": {"mode": "timeout", "times": 2}}}, headers=h)
         assert set_.json() == {"faults": {"get_billing": {"mode": "timeout", "times": 2}}}
-        assert c.get("/sandbox/status", headers=h).json()["faults"]["get_billing"]["times"] == 2
+        got = c.get("/sandbox/status", headers=h).json()
+        assert got["faults"]["get_billing"]["times"] == 2
+        assert len(got["prompts"]) == 12 and len(got["tools"]) == 12  # fingerprints for TruAssure's comparisons
         assert c.post("/sandbox/reset", headers=h).json() == {"status": "reset"}
         assert c.get("/sandbox/status", headers=h).json()["faults"] == {}
         assert c.post("/mcp", json={}, headers={"X-Identity": "forged.token"}).status_code == 403

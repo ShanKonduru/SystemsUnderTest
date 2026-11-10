@@ -31,6 +31,20 @@ from desk import identity as idmod
 from desk.backend import AccessDenied, BackendError, DeskBackend, Identity, init_db, member_permissions
 from desk.config import Settings
 
+
+def fingerprints() -> dict[str, str]:
+    """The agents' instructions and the tool definitions, each as a short hash (the model is on triage's /healthz)."""
+    from pathlib import Path
+
+    from desk import agents
+
+    prompts = agents.TRIAGE_ROUTE_SYSTEM + agents.TRIAGE_SYSTEM + agents.BILLING_SYSTEM + agents.CLAIMS_SYSTEM
+    tools = Path(__file__).read_text(encoding="utf-8")
+    return {
+        "prompts": hashlib.sha256(prompts.encode()).hexdigest()[:12],
+        "tools": hashlib.sha256(tools.encode()).hexdigest()[:12],
+    }
+
 READ = ToolAnnotations(read_only_hint=True)
 WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False)
 MAX_SERVERS = 256
@@ -173,7 +187,8 @@ def create_app(settings: Settings | None = None) -> Any:
 
     @api.get("/sandbox/status", dependencies=[Depends(require_sandbox)])
     async def status() -> dict[str, Any]:
-        return {"sandbox": True, "today": settings.today.isoformat(), "faults": faults.faults}
+        # what decides behaviour besides the deployment, so a test run can tell a build change from a deployment one
+        return {"sandbox": True, "today": settings.today.isoformat(), "faults": faults.faults} | fingerprints()
 
     @api.post("/sandbox/faults", dependencies=[Depends(require_sandbox)])
     async def set_faults(body: FaultsBody) -> dict[str, Any]:
