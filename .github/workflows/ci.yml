@@ -121,11 +121,33 @@ jobs:
       - name: docker image builds
         run: docker compose build
 
+  # The Windows desktop app: no Python and no image. It builds with the C# compiler that ships with Windows; the
+  # self-test covers prices, rules, the store, options and every UI release rule. (tools\smoke.bat drives the real
+  # UI and needs an interactive desktop, so it runs locally, not here.)
+  sut-policy-desk:
+    name: policy desk (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+        working-directory: policy-desk
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: build the app (warnings are errors)
+        run: app\build.bat
+      - name: self-test
+        run: app\bin\policydesk-cli.exe --self-test
+      - name: locator maps for every release
+        run: |
+          for %%r in (v1 v2 v3 v4) do app\bin\policydesk-cli.exe --locator-map %%r --release-seed 1 --out %RUNNER_TEMP%\locator-map-%%r.json || exit /b 1
+      - name: UI Automation tools build
+        run: tools\build_tools.bat
+
   # After every app's tests pass on main: publish the images TruAssure's pilot tests run (black-box, over HTTP).
   # Tags: sha-<commit> (what TruAssure pins) and latest.
   publish-images:
     name: publish images
-    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-multi-agent-desk, sut-automation-lab]
+    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-multi-agent-desk, sut-automation-lab, sut-policy-desk]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

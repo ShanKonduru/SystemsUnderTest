@@ -1,0 +1,7 @@
+# Build output (app\build.bat, tools\build_tools.bat)
+app/bin/
+tools/bin/
+*.pdb
+# UI Automation reports written with -Csv / -Json
+reports/
+# The system of record and live locator map (policy-desk/data/) are ignored by the root .gitignore.

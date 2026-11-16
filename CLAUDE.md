@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repository is
 
 Demo "systems under test" (SUT) for the fictitious insurer **Harbor Mutual**, which the separate TruAssure project
-tests **black-box over HTTP** (it never imports this code). Four independent Python apps plus one shared library:
+tests **black-box** (it never imports this code): four independent Python apps over HTTP, one Windows desktop app driven
+through UI Automation, plus one shared library:
 
 | Dir | Package | What it is | Ports |
 |---|---|---|---|
@@ -14,6 +15,7 @@ tests **black-box over HTTP** (it never imports this code). Four independent Pyt
 | `claims-agent` | `claims_agent` | Event-driven back-office agent, no chat; agent + MCP tool server | 8100, 9100 |
 | `multi-agent-desk` | `desk` | Triage → billing → claims agents with signed identity propagation | 8300 (triage), 9300 (tools) |
 | `automation-lab` | `automation_lab` | No-login web UI for test-script generation/execution/self-healing; **no LLM**, no `harbor_llm` dependency | 8400 |
+| `policy-desk` | C# (`PolicyDesk`) | Windows WinForms thick client for desktop automation, script generation and self-healing; **no Python, no LLM, no image** | — |
 
 Because TruAssure tests these apps, **behaviour visible over HTTP, tool names/arguments, seed data, response
 shapes and the planted defects are a contract**. CI publishes `ghcr.io/<owner>/harbor-{claims-agent,member-desk,chat-assistant,automation-lab}`
@@ -37,6 +39,7 @@ py -3.12 -m venv .venv
 | `claims-agent` | `ruff check claims_agent tests` | `python -m pytest -q --cov` |
 | `multi-agent-desk` | `ruff check desk tests` | `python -m pytest -q --cov` |
 | `automation-lab` | `ruff check automation_lab tests` | `python -m pytest -q --cov` (install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm`) |
+| `policy-desk` | `app\build.bat` (csc from .NET Framework 4.x, `/warnaserror+`) | `app\bin\policydesk-cli.exe --self-test`; `tools\smoke.bat` drives the real UI (local only, needs a desktop) |
 
 Single test: `python -m pytest tests/test_engine.py::test_name -q`. All tests are offline (scripted LLM, no keys);
 pytest uses `asyncio_mode = "auto"`, so async tests need no decorator.
@@ -95,6 +98,17 @@ JS must reach elements via `HM.$(authoredId)`, create them via `HM.h()`, use `HM
 select by id or `data-testid` — otherwise v2/v3 break. A pytest checks every literal `$("id")` in `app.js` exists in
 `index.html`. Hidden pages stay in the DOM, so browser scripts must scope to the visible page region.
 `e2e/smoke.py` (Playwright, not in CI) drives every area in v1–v3 and checks the locator map, v4 and drift.
+
+**policy-desk.** C# 5 only (the compiler that ships with Windows): no string interpolation, `?.`, `nameof`,
+expression-bodied members or `out var`. `app/`: `Program.cs` (launch options = test hooks, each with a
+`POLICYDESK_*` variable), `Domain.cs` (pricing, underwriting, validation, the JSON store `data\policydesk.json` with
+its activity log), `Releases.cs` (`ReleaseUi`, the locator map), `Forms.cs` (screens), `SelfTest.cs`. Every control
+is created through `ReleaseUi` (`Reg`, `Button`, `Field`, `Menu`) with its authored v1 name, so `releases.json` can
+rename it, change its text or type, swap its row, and drift can rename it live. Release rules live only in
+`releases.json`; the self-test fails if a rule names an element or text that doesn't exist, or if v2 misses a
+control. The locator map must match what native UIA3 really reports (verify with `tools\uia_report.bat` and
+`tools\smoke.bat`); the legacy toolbar, Notes box and chart stay unnamed on purpose. Generation inputs are in
+`policy-desk/docs/`.
 
 **Planted defects.** `CLAIMS_DEFECTS` / `DESK_DEFECTS` / `LAB_DEFECTS` (comma-separated; see `defects.py` in each app) switch on
 deliberate bugs so TruAssure can prove it catches them. Unknown names are errors. They must stay off by default

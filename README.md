@@ -20,6 +20,7 @@ it tests them black-box, over HTTP, like any client's agent.
 | [`claims-agent`](claims-agent) | Event-driven back-office claims agent (no UI) | http://127.0.0.1:8100 |
 | [`multi-agent-desk`](multi-agent-desk) | Triage, billing and claims agents with identity propagation | http://127.0.0.1:8300 |
 | [`automation-lab`](automation-lab) | Web UI for test-script generation, execution and self-healing (no login, no LLM) | http://127.0.0.1:8400 |
+| [`policy-desk`](policy-desk) | Windows desktop app (WinForms) for desktop automation, script generation and self-healing (no LLM, no image) | `policy-desk\start_policy_desk.bat` |
 
 ## Configure the LLM once
 

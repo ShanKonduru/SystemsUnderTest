@@ -1,0 +1,112 @@
+{
+  "_comment": "UI release rules, the single source for the screens (Releases.cs) and the locator map. Keys of the maps are the authored (v1) control names or texts. build.bat copies this file next to the exe.",
+  "releases": ["v1", "v2", "v3", "v4"],
+  "schemes": {"v1": "authored", "v2": "renamed", "v3": "random", "v4": "random"},
+  "descriptions": {
+    "v1": "Baseline: the app as written.",
+    "v2": "Redesign: every AutomationId renamed, button, menu and window texts changed, two pairs of fields swapped. Labels are stable.",
+    "v3": "Dynamic: v2's texts and swaps, with a random AutomationId for every control on every launch (fixed with --release-seed).",
+    "v4": "Structural: v3, plus reworded labels (so field Names change), six buttons that become hyperlinks and two more swaps."
+  },
+  "names": {
+    "v2": {
+      "LoginForm": "frmHmSignIn", "MainForm": "frmHmPolicyDesk", "QuoteDetailsForm": "frmHmQuoteView", "DeclineForm": "frmHmReject",
+      "OptionsForm": "frmHmPreferences", "ProductGuideForm": "frmHmProductHelp",
+
+      "txtUser": "hmAgentName", "txtPassword": "hmAgentSecret", "cboOffice": "hmAgentBranch", "lblError": "hmSignInMessage",
+      "btnSignIn": "hmSignInSubmit", "btnCancel": "hmSignInCancel",
+
+      "txtDetailQuote": "hmViewQuoteNo", "txtDetailPolicyholder": "hmViewInsured", "txtDetailProduct": "hmViewProduct",
+      "txtDetailDeductible": "hmViewDeductible", "txtDetailStart": "hmViewEffective", "txtDetailPremium": "hmViewPremium",
+      "txtDetailPlan": "hmViewPlan", "txtDetailStatus": "hmViewStatus", "txtDetailPolicy": "hmViewPolicyNo",
+      "txtDetailNote": "hmViewUwNote", "btnBind": "hmViewIssue", "btnDecline": "hmViewReject", "btnClose": "hmViewClose",
+
+      "cboReason": "hmRejectReason", "txtDeclineNote": "hmRejectNote", "lblDeclineError": "hmRejectMessage",
+      "btnConfirmDecline": "hmRejectConfirm", "btnCancelDecline": "hmRejectCancel",
+
+      "cboDefaultOffice": "hmPrefBranch", "grpDefaultPlan": "hmPrefPlanGroup", "rbDefaultAnnual": "hmPrefPlanYearly",
+      "rbDefaultMonthly": "hmPrefPlanMonthly", "chkConfirmDiscard": "hmPrefConfirmDiscard", "chkShowChart": "hmPrefShowChart",
+      "btnOptionsOk": "hmPrefSave", "btnOptionsCancel": "hmPrefCancel",
+
+      "tvProducts": "hmHelpTree", "txtGuideDetail": "hmHelpText", "btnGuideClose": "hmHelpClose",
+
+      "tabMain": "hmTabs", "menuMain": "hmMenuBar", "toolbarMain": "hmToolBar", "statusMain": "hmStatusBar",
+      "mnuFile": "hmMenuFile", "mnuNewQuote": "hmMenuCreate", "mnuSaveQuote": "hmMenuSave", "mnuExport": "hmMenuExport",
+      "mnuExit": "hmMenuQuit", "mnuQuotes": "hmMenuQuotes", "mnuFind": "hmMenuSearch", "mnuOpenQuote": "hmMenuView",
+      "mnuEditQuote": "hmMenuChange", "mnuTools": "hmMenuTools", "mnuOptions": "hmMenuPrefs", "mnuHelp": "hmMenuHelp",
+      "mnuGuide": "hmMenuProductHelp", "mnuAbout": "hmMenuAbout",
+      "lblStatus": "hmStatusText", "lblCount": "hmStatusCount", "lblRelease": "hmStatusRelease", "lblUser": "hmStatusAgent",
+
+      "tabQuote": "hmTabQuote", "grpPolicyholder": "hmInsuredGroup", "txtPolicyholder": "hmInsuredName",
+      "cboCustomerType": "hmInsuredKind", "txtEmail": "hmInsuredEmail", "mtbPhone": "hmInsuredPhone",
+      "grpCoverage": "hmCoverGroup", "cboProduct": "hmCoverProduct", "cboCoverage": "hmCoverLevel",
+      "cboDeductible": "hmCoverDeductible", "dtpStart": "hmCoverEffective", "chkRoadside": "hmCoverRoadside",
+      "chkMultiPolicy": "hmCoverBundle", "rbAnnual": "hmPlanYearly", "rbMonthly": "hmPlanMonthly",
+      "lblPremium": "hmPriceTotal", "lblInstallment": "hmPriceInstalment", "lblUnderwriting": "hmUwStatus",
+      "prgUnderwriting": "hmUwProgress", "lblErrors": "hmFormErrors", "pnlChart": "hmPremiumChart",
+      "btnCalculate": "hmPriceIt", "btnCheck": "hmRunUw", "btnSave": "hmSaveQuote", "btnClear": "hmResetForm",
+
+      "tabQuotes": "hmTabList", "txtFilter": "hmSearchInsured", "cboStatusFilter": "hmSearchStatus", "btnFind": "hmSearchGo",
+      "btnOpenQuote": "hmListView", "btnEditQuote": "hmListChange", "btnExport": "hmListExport", "dgvQuotes": "hmQuoteGrid",
+      "ctxQuotes": "hmGridMenu", "ctxOpenQuote": "hmGridView", "ctxEditQuote": "hmGridChange", "ctxCopyNumber": "hmGridCopy",
+
+      "tabActivity": "hmTabAudit", "lvActivity": "hmAuditList", "btnRefreshActivity": "hmAuditReload"
+    }
+  },
+  "text": {
+    "v2": {
+      "Harbor Mutual Policy Desk 3.0": "Policy Desk 3.1 - Harbor Mutual",
+      "Sign in - Harbor Mutual Policy Desk": "Harbor Mutual - Sign in",
+      "Sign in": "Log in",
+      "&Calculate": "&Price it", "Check &underwriting": "Run &underwriting", "Save quote": "Save", "Update quote": "Save changes",
+      "Clear": "Reset", "Find": "Search", "Open quote": "View", "Edit quote": "Change quote", "Export...": "Export to CSV...",
+      "&Bind policy": "&Issue policy", "&Decline...": "&Reject...", "Decline quote": "Reject quote", "Refresh": "Reload",
+      "Options": "Preferences", "OK": "Save",
+      "&New quote": "&Create quote", "&Export quotes...": "&Export to CSV...", "&Open selected": "&View selected",
+      "&Edit selected": "&Change selected", "&Options...": "&Preferences...", "&Open": "&View", "&Edit": "&Change",
+      "Quotes": "Quote list", "Activity": "Audit log", "Premium": "Annual premium", "Start": "Effective"
+    },
+    "v3": {
+      "Harbor Mutual Policy Desk 3.0": "Policy Desk 3.1 - Harbor Mutual",
+      "Sign in - Harbor Mutual Policy Desk": "Harbor Mutual - Sign in",
+      "Sign in": "Log in",
+      "&Calculate": "&Price it", "Check &underwriting": "Run &underwriting", "Save quote": "Save", "Update quote": "Save changes",
+      "Clear": "Reset", "Find": "Search", "Open quote": "View", "Edit quote": "Change quote", "Export...": "Export to CSV...",
+      "&Bind policy": "&Issue policy", "&Decline...": "&Reject...", "Decline quote": "Reject quote", "Refresh": "Reload",
+      "Options": "Preferences", "OK": "Save",
+      "&New quote": "&Create quote", "&Export quotes...": "&Export to CSV...", "&Open selected": "&View selected",
+      "&Edit selected": "&Change selected", "&Options...": "&Preferences...", "&Open": "&View", "&Edit": "&Change",
+      "Quotes": "Quote list", "Activity": "Audit log", "Premium": "Annual premium", "Start": "Effective"
+    },
+    "v4": {
+      "Harbor Mutual Policy Desk 3.0": "Harbor Mutual Policy Desk 4.0",
+      "Sign in - Harbor Mutual Policy Desk": "Harbor Mutual - Agent sign-in",
+      "Sign in": "Continue",
+      "&Calculate": "Quote &price", "Check &underwriting": "Check &risk", "Save quote": "Save", "Update quote": "Save changes",
+      "Clear": "Start again", "Find": "Go", "Open quote": "Details", "Edit quote": "Amend quote", "Export...": "Download CSV...",
+      "&Bind policy": "&Issue policy", "&Decline...": "&Reject...", "Decline quote": "Reject quote", "Refresh": "Reload",
+      "Options": "Preferences", "OK": "Save",
+      "&New quote": "&Create quote", "&Export quotes...": "&Download CSV...", "&Open selected": "&Details",
+      "&Edit selected": "&Amend selected", "&Options...": "&Preferences...", "&Open": "&Details", "&Edit": "&Amend",
+      "Quotes": "Quote list", "Activity": "Audit log", "Premium": "Annual premium", "Start": "Effective",
+      "Policyholder": "Insured",
+      "&User name:": "&Agent ID:", "&Office:": "&Branch:",
+      "Policy&holder:": "Insured &name:", "Customer &type:": "&Customer is a:", "&Email:": "E&mail address:",
+      "P&hone:": "&Telephone:", "Co&verage:": "Cover &level:", "&Deductible:": "E&xcess:", "&Start date:": "E&ffective date:",
+      "Find &policyholder:": "Search &insured:",
+      "&Roadside assistance (+45.00)": "&Breakdown cover (+45.00)", "&Multi-policy discount (-10%)": "&Bundle discount (-10%)",
+      "Pay &annually": "&Yearly", "Pay m&onthly (+3%)": "M&onthly instalments (+3%)"
+    }
+  },
+  "types": {
+    "v4": {
+      "btnCalculate": "link", "btnClear": "link", "btnFind": "link", "btnOpenQuote": "link", "btnEditQuote": "link",
+      "btnRefreshActivity": "link"
+    }
+  },
+  "swaps": {
+    "v2": [["txtEmail", "mtbPhone"], ["cboCoverage", "cboDeductible"]],
+    "v3": [["txtEmail", "mtbPhone"], ["cboCoverage", "cboDeductible"]],
+    "v4": [["txtEmail", "mtbPhone"], ["cboCoverage", "cboDeductible"], ["rbAnnual", "rbMonthly"], ["txtUser", "txtPassword"]]
+  }
+}
