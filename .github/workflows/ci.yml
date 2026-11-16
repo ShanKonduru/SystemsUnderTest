@@ -142,6 +142,14 @@ jobs:
           for %%r in (v1 v2 v3 v4) do app\bin\policydesk-cli.exe --locator-map %%r --release-seed 1 --out %RUNNER_TEMP%\locator-map-%%r.json || exit /b 1
       - name: UI Automation tools build
         run: tools\build_tools.bat
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: lint the baseline suite (it drives the real UI, so it runs locally)
+        run: |
+          python -m pip install -r requirements-test.txt || exit /b 1
+          ruff check screens tests tools || exit /b 1
+          python -m pytest --collect-only -q
 
   # After every app's tests pass on main: publish the images TruAssure's pilot tests run (black-box, over HTTP).
   # Tags: sha-<commit> (what TruAssure pins) and latest.

@@ -163,7 +163,9 @@ namespace PolicyDesk
             if (input.CustomerType == "Business") premium = Round(premium * (1 + Catalog.BusinessLoading));
             if (input.MultiPolicy) premium = Round(premium * (1 - Catalog.MultiPolicyDiscount));
             if (input.Roadside && input.Product == "Auto") premium += Catalog.RoadsideFee;
-            decimal installment = Round(premium * (1 + Catalog.InstallmentFee) / 12);
+            decimal installment = Defects.Has("monthly_truncated")
+                ? Math.Truncate(premium * (1 + Catalog.InstallmentFee) / 12 * 100) / 100
+                : Round(premium * (1 + Catalog.InstallmentFee) / 12);
             return new Price
             {
                 Annual = premium,
@@ -174,7 +176,7 @@ namespace PolicyDesk
 
         public static UwResult Underwrite(QuoteInput input, Price price, IEnumerable<Quote> existing)
         {
-            if (input.Product == "Umbrella")
+            if (input.Product == "Umbrella" && !Defects.Has("umbrella_unchecked"))
             {
                 string holder = input.Policyholder.Trim();
                 bool covered = existing.Any(q => q.Status == "Bound"
@@ -203,7 +205,7 @@ namespace PolicyDesk
                 errors.Add(new FieldError("email", "Enter a valid email address."));
             if (input.Phone.Length > 0 && input.Phone.Length != 10)
                 errors.Add(new FieldError("phone", "Enter a 10-digit phone number."));
-            if (input.StartDate.Date < today.Date)
+            if (input.StartDate.Date < today.Date || (Defects.Has("start_today_rejected") && input.StartDate.Date == today.Date))
                 errors.Add(new FieldError("start", "Start date cannot be in the past."));
             else if (input.StartDate.Date > today.Date.AddDays(Catalog.MaxStartDays))
                 errors.Add(new FieldError("start", "Start date must be within " + Catalog.MaxStartDays + " days."));
@@ -324,9 +326,18 @@ namespace PolicyDesk
 
         public Quote Find(int number) { return Quotes.FirstOrDefault(q => q.Number == number); }
 
+        // The price the store records. With multi_policy_ignored it disagrees with the screen.
+        static Price StoredPrice(QuoteInput input)
+        {
+            if (!Defects.Has("multi_policy_ignored")) return Pricing.Calculate(input);
+            var priced = input.Clone();
+            priced.MultiPolicy = false;
+            return Pricing.Calculate(priced);
+        }
+
         public Quote AddQuote(QuoteInput input, string user, string office)
         {
-            var price = Pricing.Calculate(input);
+            var price = StoredPrice(input);
             var uw = Pricing.Underwrite(input, price, Quotes);
             var quote = new Quote
             {
@@ -341,7 +352,7 @@ namespace PolicyDesk
         public void UpdateQuote(Quote quote, QuoteInput input, string user)
         {
             if (!quote.Editable) throw new InvalidOperationException("Quote " + quote.Number + " is " + quote.Status + ".");
-            var price = Pricing.Calculate(input);
+            var price = StoredPrice(input);
             var uw = Pricing.Underwrite(input, price, Quotes.Where(q => q != quote));
             quote.Input = input.Clone();
             quote.Price = price;
@@ -354,6 +365,7 @@ namespace PolicyDesk
         public void Bind(Quote quote, string user)
         {
             if (quote.Status != "Pending") throw new InvalidOperationException("Only Pending quotes can be bound.");
+            if (Defects.Has("phantom_bind")) return;   // the caller still reports success
             quote.Status = "Bound";
             quote.PolicyNumber = "HMP-" + quote.Number;
             quote.Updated = Today;

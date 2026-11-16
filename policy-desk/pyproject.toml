@@ -1,0 +1,21 @@
+# The baseline UI test suite for Policy Desk (Python, pytest + pywinauto). The app itself is C#: see app\build.bat.
+[project]
+name = "policy-desk-baseline-suite"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# no:faulthandler: COM raises first-chance RPC exceptions (0x8001010d) it handles itself; the fault handler would
+# print each as a "fatal exception" stack dump. --basetemp: pytest's numbered temp folders trip over Windows Temp.
+addopts = "-ra --basetemp=.pytest-tmp -p no:faulthandler"
+markers = [
+    "catches(defect): the planted defect this test is there to catch (tools\\defect_matrix.py checks it does)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

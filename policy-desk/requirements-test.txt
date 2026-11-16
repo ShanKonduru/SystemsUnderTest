@@ -1,0 +1,4 @@
+# The baseline UI test suite (screens\, tests\) and its defect matrix. Windows only.
+pywinauto==0.6.9
+pytest>=8
+ruff

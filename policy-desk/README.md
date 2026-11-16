@@ -59,6 +59,7 @@ Every option also has an environment variable. The command line wins.
 | `--latency-ms N` | `POLICYDESK_LATENCY_MS` | `800` | How long the underwriting check takes (0–30000) |
 | `--password TEXT` | `POLICYDESK_PASSWORD` | `harbor` | Sign-in password |
 | `--export-dir DIR` | `POLICYDESK_EXPORT_DIR` | Documents | Folder the Export dialog opens in |
+| `--defects a,b` | `POLICYDESK_DEFECTS` | (none) | **Test runs only.** A "buggy build": planted defects (below) |
 | `--locator-map R [--out F]` | | | Write release R's locator map and exit (use `policydesk-cli.exe`) |
 | `--self-test` | | | Run the built-in checks and exit, 0 = all passed (use `policydesk-cli.exe`) |
 
@@ -105,6 +106,63 @@ Activity kinds:
 The folder is git-ignored. Check outcomes there, for example "quote 1006 is Pending at 387.50". Don't stop at the
 status bar text.
 
+## Planted defects
+
+`--defects a,b` or `POLICYDESK_DEFECTS=a,b` turns on deliberate bugs, so a test suite can show it catches them. They
+are off by default. An unknown name is refused, so a typo never runs a clean build by accident. The app never reveals
+which defects are on: not on screen, not in the activity log, not in the locator map. They live in
+[`app/Defects.cs`](app/Defects.cs) and the places it lists.
+
+| Defect | What goes wrong | Kind of bug | Caught by |
+|---|---|---|---|
+| `multi_policy_ignored` | The screen applies the 10% multi-policy discount, but the saved quote is priced without it | Screen and record disagree | `test_the_saved_premium_is_the_premium_on_screen` |
+| `monthly_truncated` | Monthly installments are cut to the cent instead of rounded (16.99 instead of 17.00) | Calculation | `test_monthly_installment_is_rounded` |
+| `umbrella_unchecked` | Umbrella is approved without a bound Auto or Home policy for the policyholder | Business rule | `test_umbrella_without_a_bound_policy_is_referred` |
+| `start_today_rejected` | A start date of today is refused as "in the past" | Boundary (off by one) | `test_a_start_date_of_today_is_accepted` |
+| `phantom_bind` | Bind policy reports the new policy number, but the quote is never bound or saved | Write reported, not persisted | `test_binding_a_pending_quote` |
+| `no_lockout` | Sign-in never locks after 3 wrong passwords | Security | `test_three_wrong_passwords_lock_sign_in` |
+| `grid_not_refreshed` | A saved or updated quote does not show in the Quotes grid until the app restarts | Stale UI | `test_a_saved_quote_is_in_the_grid_and_the_record` |
+| `export_drops_last` | Export writes every visible quote but the last, while reporting the full count | Partial output reported as complete | `test_export_writes_every_visible_quote` |
+| `slow_underwriting` | The underwriting check takes 12 seconds, whatever `--latency-ms` says | Performance and timing | `test_save_waits_for_an_underwriting_check` (and every test that waits for underwriting) |
+| `email_unlabeled` | The Email box loses its label, so UI Automation gives it no Name | Accessibility and locators | `test_every_field_is_named_by_its_label` |
+
+## The baseline test suite
+
+A pytest suite of 28 tests. It drives the app through native UI Automation with
+[pywinauto](https://pywinauto.readthedocs.io/) (backend `uia`) and checks the outcome in `policydesk.json`.
+
+- **Screen objects** in [`screens/`](screens): sign-in, the New quote tab, the Quotes tab, the details and decline
+  dialogs, message boxes, the status bar and the record.
+- **Tests** in [`tests/`](tests): sign-in and lockout, pricing, validation and its boundaries, underwriting,
+  saving, the grid and its filter, binding, declining, editing, export through the Save dialog, field names, and
+  the activity log.
+
+It is the reference that generated scripts and self-healing are measured against:
+
+- **v1 locators:** it uses the v1 AutomationIds, as a recorded suite would. It passes on v1 and stops at the first
+  locator on v2–v4.
+- **Defect coverage:** each test that targets a planted defect is marked `@pytest.mark.catches("<defect>")`.
+
+```bat
+cd policy-desk
+py -3.12 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-test.txt
+.venv\Scripts\python -m pytest                      :: builds the app, then 28 tests (about 3.5 minutes)
+.venv\Scripts\python -m pytest --release v2         :: the same suite against v2: it breaks, by design
+.venv\Scripts\python tools\defect_matrix.py         :: clean run, then each defect against its tests
+.venv\Scripts\ruff check screens tests tools
+```
+
+`tools\defect_matrix.py` takes the defect list from the app itself, so a new defect without a test fails it. It
+exits 0 only when the clean build passes and every defect makes at least one test fail. Add `--full` to run the
+whole suite against each defect (about 35 minutes).
+
+The suite moves the mouse and types, so it needs an unlocked desktop and isn't run in CI; CI lints it. Every
+launch has its own data and export folders, under `.pytest-tmp`.
+
+Result on 2026-11-16: 28 passed on the clean build, and all 10 defects caught. Each failure names the symptom, for
+example `assert 'Pending' == 'Bound'` for `phantom_bind`.
+
 ## UI releases, live drift and the locator map: self-healing
 
 Each screen is written once, as v1, and rewritten while it is built for the selected release. The rules live only in
@@ -143,7 +201,8 @@ changes.
 
 | Tool | What it does |
 |---|---|
-| `app\bin\policydesk-cli.exe --self-test` | Checks for prices, underwriting, validation, the store, options, CSV and every release rule. CI runs it on Windows |
+| `app\bin\policydesk-cli.exe --self-test` | Checks for prices, underwriting, validation, the store, options, CSV, every release rule and the defects that live in the business rules. CI runs it on Windows |
+| `pytest` and `tools\defect_matrix.py` | The baseline suite and its proof that it catches every planted defect (above) |
 | `tools\uia_report.bat -Exe app\bin\PolicyDesk.exe` | UI Automation readiness report in the two views drivers use. Grades each control and gives a readiness percentage (below) |
 | `tools\smoke.bat [v1…v4]` | End-to-end smoke through native UIA3, details below. Needs an interactive desktop, so it isn't run in CI |
 

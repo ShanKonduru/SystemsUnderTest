@@ -20,6 +20,7 @@ namespace PolicyDesk
         {
             output = writer;
             passed = failed = 0;
+            Defects.Set(new string[0]);   // the checks describe the clean build
             var today = Options.DefaultToday;
             Section("pricing", delegate { PricingChecks(); });
             Section("underwriting", delegate { UnderwritingChecks(today); });
@@ -28,6 +29,7 @@ namespace PolicyDesk
             Section("options", delegate { OptionChecks(); });
             Section("csv", delegate { CsvChecks(today); });
             Section("releases", delegate { ReleaseChecks(today); });
+            Section("defects", delegate { DefectChecks(today); });
             output.WriteLine();
             output.WriteLine(failed == 0 ? "PASSED: " + passed + " checks" : "FAILED: " + failed + " of " + (passed + failed) + " checks");
             return failed;
@@ -290,6 +292,56 @@ namespace PolicyDesk
             Check(before == "txtUser" && after != before && after.StartsWith("c"), "Drift renames controls already on screen", before + " -> " + after);
             var drifted = Root(drifting, options);
             Check((bool)drifted["dynamic"] && (int)drifted["drift_generation"] == 1, "After drift the map is dynamic, generation 1", "");
+        }
+
+        // Each defect that lives in the business rules must change their result; the clean build must not.
+        static void DefectChecks(DateTime today)
+        {
+            Func<string, string> noEnv = name => null;
+            Equal(0, Options.Parse(new string[0], noEnv).Defects.Count, "No defects by default");
+            Equal(2, Options.Parse(new[] { "--defects", " no_lockout , phantom_bind " }, noEnv).Defects.Count, "--defects reads a list");
+            Func<string, string> env = name => name == "POLICYDESK_DEFECTS" ? "slow_underwriting" : null;
+            Check(Options.Parse(new string[0], env).Defects.Contains("slow_underwriting"), "POLICYDESK_DEFECTS is read", "");
+            foreach (var bad in new[] { new[] { "--defects", "nope" }, new[] { "--defects", "no_lockout,typo" } })
+            {
+                bool threw = false;
+                try { Options.Parse(bad, noEnv); } catch (OptionsException) { threw = true; }
+                Check(threw, "Unknown defect refused: " + bad[1], "");
+            }
+            try
+            {
+                var renters = Input("Renters", "Basic", 250);
+                renters.PaymentPlan = "Monthly";
+                Defects.Set(new[] { "monthly_truncated" });
+                Equal(16.99m, Pricing.Calculate(renters).Installment, "monthly_truncated: 16.99 instead of 17.00");
+
+                var umbrella = Input("Umbrella", "Standard", 500);
+                Defects.Set(new[] { "umbrella_unchecked" });
+                Equal("Approved", Pricing.Underwrite(umbrella, Pricing.Calculate(umbrella), Store.Seed(today).Quotes).Decision,
+                      "umbrella_unchecked: Umbrella approved without a bound policy");
+
+                var start = Input("Auto", "Standard", 500);
+                start.StartDate = today;
+                Defects.Set(new[] { "start_today_rejected" });
+                Equal(1, Pricing.Validate(start, today).Count, "start_today_rejected: today is refused");
+
+                var store = Store.Seed(today);
+                var multi = Input("Auto", "Standard", 500);
+                multi.MultiPolicy = true;
+                Defects.Set(new[] { "multi_policy_ignored" });
+                Equal(540.00m, Pricing.Calculate(multi).Annual, "multi_policy_ignored: the screen still shows 540.00");
+                Equal(600.00m, store.AddQuote(multi, "t", "Boston").Price.Annual, "multi_policy_ignored: the saved quote is 600.00");
+
+                Defects.Set(new[] { "phantom_bind" });
+                store.Bind(store.Find(1002), "t");
+                Equal("Pending", store.Find(1002).Status, "phantom_bind: the quote stays Pending");
+            }
+            finally
+            {
+                Defects.Set(new string[0]);
+            }
+            Equal(17.00m, Pricing.Calculate(new QuoteInput { Product = "Renters", Coverage = "Basic", Deductible = 250 }).Installment,
+                  "With the defects off again, 17.00");
         }
 
         static Dictionary<string, object> Root(ReleaseUi ui, Options options)

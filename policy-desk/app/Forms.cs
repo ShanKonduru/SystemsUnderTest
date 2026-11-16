@@ -97,13 +97,14 @@ namespace PolicyDesk
 
         void TrySignIn()
         {
-            if (failures >= MaxAttempts) return;
+            bool locks = !Defects.Has("no_lockout");
+            if (locks && failures >= MaxAttempts) return;
             if (UserName.Length == 0) { lblError.Text = "Enter your user name."; txtUser.Focus(); return; }
             if (txtPassword.Text != options.Password)
             {
                 failures++;
                 store.Log(UserName, "sign_in_failed", "attempt " + failures + " of " + MaxAttempts);
-                if (failures >= MaxAttempts)
+                if (locks && failures >= MaxAttempts)
                 {
                     lblError.Text = "Too many attempts. Restart Policy Desk.";
                     btnSignIn.Enabled = false;
@@ -123,6 +124,8 @@ namespace PolicyDesk
     class QuoteDetailsForm : Form
     {
         const string W = "QuoteDetailsForm";
+
+        public string Action = "";   // "bound" or "declined" once the dialog closes with OK
 
         public QuoteDetailsForm(ReleaseUi ui, Store store, Quote quote, string user)
         {
@@ -151,6 +154,7 @@ namespace PolicyDesk
             var btnBind = ui.Button(W, "btnBind", "&Bind policy", delegate
             {
                 store.Bind(quote, user);
+                Action = "bound";
                 DialogResult = DialogResult.OK;
             });
             btnBind.Enabled = quote.Status == "Pending";
@@ -162,6 +166,7 @@ namespace PolicyDesk
                 {
                     if (decline.ShowDialog(this) != DialogResult.OK) return;
                     store.Decline(quote, decline.Reason, user);
+                    Action = "declined";
                     DialogResult = DialogResult.OK;
                 }
             });
@@ -524,7 +529,8 @@ namespace PolicyDesk
             holder.SetBounds(12, 10, 430, 160);
             ui.Field(holder, W, "Policy&holder:", txtPolicyholder, "txtPolicyholder", "Edit", 12, 26, 110, 290, 0);
             ui.Field(holder, W, "Customer &type:", cboCustomerType, "cboCustomerType", "ComboBox", 12, 58, 110, 290, 2);
-            ui.Field(holder, W, "&Email:", txtEmail, "txtEmail", "Edit", 12, 90, 110, 290, 4);
+            var emailLabel = ui.Field(holder, W, "&Email:", txtEmail, "txtEmail", "Edit", 12, 90, 110, 290, 4);
+            if (Defects.Has("email_unlabeled")) emailLabel.TabIndex = 90;   // no longer just before the box: no Name
             mtbPhone.TextMaskFormat = MaskFormat.ExcludePromptAndLiterals;
             mtbPhone.CutCopyMaskFormat = MaskFormat.ExcludePromptAndLiterals;
             ui.Field(holder, W, "P&hone:", mtbPhone, "mtbPhone", "Edit", 12, 122, 110, 290, 6);
@@ -843,8 +849,9 @@ namespace PolicyDesk
             lblUnderwriting.Text = "Underwriting: checking...";
             SetStatus("Checking underwriting...");
             underwritingTimer.Tag = mine;
-            if (options.LatencyMs <= 0) { FinishUnderwriting(); return; }
-            underwritingTimer.Interval = options.LatencyMs;
+            int latency = Defects.Has("slow_underwriting") ? 12000 : options.LatencyMs;
+            if (latency <= 0) { FinishUnderwriting(); return; }
+            underwritingTimer.Interval = latency;
             underwritingTimer.Start();
         }
 
@@ -894,7 +901,7 @@ namespace PolicyDesk
             string verb = editing != 0 ? "updated" : "saved";
             dirty = false;
             ClearForm();
-            RefreshQuotes();
+            if (!Defects.Has("grid_not_refreshed")) RefreshQuotes();
             SetStatus("Quote " + quote.Number + " " + verb + " (" + quote.Status + ")");
         }
 
@@ -999,13 +1006,15 @@ namespace PolicyDesk
         {
             var quote = SelectedQuote();
             if (quote == null) return;
+            string action;
             using (var details = new QuoteDetailsForm(ui, store, quote, user))
             {
                 if (details.ShowDialog(this) != DialogResult.OK) return;
+                action = details.Action;
             }
             RefreshQuotes();
-            SetStatus(quote.Status == "Bound" ? "Quote " + quote.Number + " bound as policy " + quote.PolicyNumber
-                                              : "Quote " + quote.Number + " declined");
+            SetStatus(action == "bound" ? "Quote " + quote.Number + " bound as policy HMP-" + quote.Number
+                                        : "Quote " + quote.Number + " declined");
         }
 
         void EditSelected()
@@ -1052,7 +1061,8 @@ namespace PolicyDesk
             })
             {
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                File.WriteAllText(dialog.FileName, Csv(rows), new UTF8Encoding(false));
+                var written = Defects.Has("export_drops_last") && rows.Count > 0 ? rows.Take(rows.Count - 1) : rows;
+                File.WriteAllText(dialog.FileName, Csv(written), new UTF8Encoding(false));
                 store.Log(user, "quotes_exported", rows.Count + " to " + Path.GetFileName(dialog.FileName));
                 SetStatus("Exported " + rows.Count + " quote(s) to " + Path.GetFileName(dialog.FileName));
             }

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRCS=(Program.cs Domain.cs Releases.cs Forms.cs SelfTest.cs)
+SRCS=(Program.cs Domain.cs Releases.cs Forms.cs Defects.cs SelfTest.cs)
 REFS=(System.dll System.Core.dll System.Drawing.dll System.Windows.Forms.dll System.Web.Extensions.dll)
 mkdir -p "${HERE}/bin"
 

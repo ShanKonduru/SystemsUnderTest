@@ -12,7 +12,7 @@ if not exist "%CSC%" (
 )
 if not exist "%HERE%bin" mkdir "%HERE%bin"
 set "REFS=/r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll"
-set "SRC="%HERE%Program.cs" "%HERE%Domain.cs" "%HERE%Releases.cs" "%HERE%Forms.cs" "%HERE%SelfTest.cs""
+set "SRC="%HERE%Program.cs" "%HERE%Domain.cs" "%HERE%Releases.cs" "%HERE%Forms.cs" "%HERE%Defects.cs" "%HERE%SelfTest.cs""
 "%CSC%" /nologo /target:winexe /optimize+ /warnaserror+ /out:"%HERE%bin\PolicyDesk.exe" %REFS% %SRC%
 if errorlevel 1 exit /b 1
 "%CSC%" /nologo /target:exe /optimize+ /warnaserror+ /define:CONSOLE /out:"%HERE%bin\policydesk-cli.exe" %REFS% %SRC%

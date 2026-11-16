@@ -5,3 +5,7 @@ tools/bin/
 # UI Automation reports written with -Csv / -Json
 reports/
 # The system of record and live locator map (policy-desk/data/) are ignored by the root .gitignore.
+# The baseline suite: its virtual environment and per-run folders
+.venv/
+.pytest-tmp/
+.pytest_cache/

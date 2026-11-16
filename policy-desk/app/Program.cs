@@ -40,6 +40,7 @@ namespace PolicyDesk
         public string LocatorMapRelease;
         public string OutFile;
         public bool Help;
+        public HashSet<string> Defects = new HashSet<string>();
 
         public const string Usage =
             "PolicyDesk.exe [options]\n" +
@@ -52,6 +53,7 @@ namespace PolicyDesk
             "  --latency-ms N          underwriting check delay              POLICYDESK_LATENCY_MS (800, 0-30000)\n" +
             "  --password TEXT         sign-in password                      POLICYDESK_PASSWORD (harbor)\n" +
             "  --export-dir DIR        folder the Export dialog opens in     POLICYDESK_EXPORT_DIR\n" +
+            "  --defects a,b           test runs only: planted defects       POLICYDESK_DEFECTS (see README)\n" +
             "  --locator-map RELEASE   write the locator map and exit (with --out FILE, or to the console)\n" +
             "  --self-test             run the built-in checks and exit (0 = all passed)\n" +
             "  --help                  show this text";
@@ -82,6 +84,7 @@ namespace PolicyDesk
                     case "--password": o.Password = Value(args, ref i); break;
                     case "--export-dir": o.ExportDir = Path.GetFullPath(Value(args, ref i)); break;
                     case "--locator-map": o.LocatorMapRelease = ParseRelease(Value(args, ref i)); break;
+                    case "--defects": o.Defects = PolicyDesk.Defects.Parse("--defects", Value(args, ref i)); break;
                     case "--out": o.OutFile = Path.GetFullPath(Value(args, ref i)); break;
                     default: throw new OptionsException("Unknown option: " + arg);
                 }
@@ -101,6 +104,7 @@ namespace PolicyDesk
             if (Has(env, "POLICYDESK_LATENCY_MS", out v)) o.LatencyMs = ParseInt("POLICYDESK_LATENCY_MS", v, 0, 30000);
             if (Has(env, "POLICYDESK_PASSWORD", out v)) o.Password = v;
             if (Has(env, "POLICYDESK_EXPORT_DIR", out v)) o.ExportDir = Path.GetFullPath(v);
+            if (Has(env, "POLICYDESK_DEFECTS", out v)) o.Defects = PolicyDesk.Defects.Parse("POLICYDESK_DEFECTS", v);
         }
 
         static bool Has(Func<string, string> env, string name, out string value)
@@ -182,6 +186,7 @@ namespace PolicyDesk
                     return Say(console, Json.Write(LocatorMap.Build(mapUi, options)), 0, options.OutFile);
                 }
 
+                Defects.Set(options.Defects);   // only the app itself runs with them; the self-test and maps never do
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 var store = Store.Open(options.DataDir, options.Reset, options.Today);

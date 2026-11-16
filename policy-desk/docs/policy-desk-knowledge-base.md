@@ -452,6 +452,7 @@ Every option has an environment variable; the command line wins. An empty variab
 | `--drift N` | `POLICYDESK_DRIFT_SECONDS` | 0 | Rename every control every N seconds from launch, the sign-in dialog included (0 = off, else 2–300) |
 | `--latency-ms N` | `POLICYDESK_LATENCY_MS` | 800 | Duration of the underwriting check (0–30000) |
 | `--password TEXT` | `POLICYDESK_PASSWORD` | harbor | Sign-in password; must not be empty |
+| `--defects a,b` | `POLICYDESK_DEFECTS` | (none) | Test runs only: planted defects (see "Planted defects and the baseline suite") |
 | `--export-dir DIR` | `POLICYDESK_EXPORT_DIR` | Documents | Folder the Export dialog opens in |
 | `--locator-map R` | — | — | Write release R's locator map as JSON and exit (with `--out FILE`, else to the console) |
 | `--out FILE` | — | — | Output file for `--locator-map` or `--self-test`; the console build prints "Wrote \<path>" |
@@ -474,6 +475,25 @@ Invalid options stop the app with exit code 2. The console build prints the mess
 | `--password ""` | The password must not be empty. |
 
 Use `policydesk-cli.exe` for `--self-test`, `--locator-map` and `--help` so the output reaches the console and the exit code can be awaited. Do not pass GUI options to the console build expecting a console-only run: without `--self-test`, `--locator-map` or `--help` it opens the GUI.
+
+## Planted defects and the baseline suite
+
+`--defects a,b` (or `POLICYDESK_DEFECTS`) switches on deliberate bugs for test runs. They are off by default, unknown names are refused (exit code 2), and the app never shows which are on. Each is caught by a test of the baseline suite in `tests/` (pytest + pywinauto, marked `@pytest.mark.catches("<defect>")`); `tools\defect_matrix.py` proves the clean build passes and every defect fails its test.
+
+| Defect | Symptom a test sees |
+| --- | --- |
+| `multi_policy_ignored` | The screen shows 540.00 with the multi-policy discount; the `policydesk.json` premium is 600.00 |
+| `monthly_truncated` | Renters, Basic, 250, monthly reads "Monthly: 12 x 16.99 (203.88 a year)" instead of 17.00 (204.00) |
+| `umbrella_unchecked` | Umbrella for a new policyholder is "Underwriting: Approved" instead of Referred |
+| `start_today_rejected` | A start date of 2026-11-03 (today) gives "Start date cannot be in the past." |
+| `phantom_bind` | The status says "Quote 1002 bound as policy HMP-1002", but the grid and the record still say Pending |
+| `no_lockout` | A third wrong password gives "Invalid user name or password." again; Sign in stays enabled |
+| `grid_not_refreshed` | "Quote 1006 saved (Pending)", but the Quotes grid has no row 1006 and the count stays "5 quotes" |
+| `export_drops_last` | "Exported 2 quote(s)", but the CSV holds only the first |
+| `slow_underwriting` | The underwriting result takes 12 s, whatever `--latency-ms` says |
+| `email_unlabeled` | The Email box's UI Automation Name is empty instead of "Email:" |
+
+The suite uses the v1 AutomationIds, the way a recorded suite would: it passes on v1 and fails at its first locator on v2–v4. That failure is the starting point self-healing is measured from.
 
 ## UI releases, live drift and the locator map (self-healing)
 
