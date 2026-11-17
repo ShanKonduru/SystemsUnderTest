@@ -16,6 +16,7 @@ import asyncio
 import dataclasses
 import inspect
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
@@ -35,6 +36,7 @@ ConfirmFn = Callable[[ConfirmationRequest], Awaitable[bool] | bool]
 EventFn = Callable[[Event], Awaitable[None] | None]
 
 MAX_TOOL_RESULT_CHARS = 20_000
+CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -272,8 +274,11 @@ class CopilotSession:
         return missing if len(actionable) >= 2 else []
 
     def _skipped_reads(self, trace: TurnTrace) -> list[str]:
-        """Read-only tools in scope that this turn's plan names but that never ran."""
-        if trace.plan is None:
+        """Read-only tools in scope that this turn's plan names but that never ran.
+
+        None when the customer asked about another customer's account: the tools are bound to the signed-in
+        customer, so a lookup can't answer that, and pressing for one turned a refusal into "you have no claims"."""
+        if trace.plan is None or self._names_other_customer(trace):
             return []
         done = {c.name for c in trace.tool_calls if c.executed}
         out: list[str] = []
@@ -283,6 +288,14 @@ class CopilotSession:
                     and s.action not in done and s.action not in out):
                 out.append(s.action)
         return out
+
+    def _names_other_customer(self, trace: TurnTrace) -> bool:
+        """A customer (not a representative) named a customer id that isn't their own."""
+        if self.is_rep:
+            return False
+        said = [trace.user_message] + ([e.value for e in trace.intent.entities] if trace.intent else [])
+        ids = {m.upper() for s in said for m in CUSTOMER_ID.findall(s)}
+        return bool(ids - {self.customer_id.upper()})
 
     def _precheck(self, rec: ToolCallRecord) -> str | None:
         """Why the backend would refuse this write, known before asking the customer to approve it; or None."""

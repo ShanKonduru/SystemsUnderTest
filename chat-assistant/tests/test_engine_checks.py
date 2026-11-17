@@ -69,3 +69,25 @@ async def test_the_plan_check_asks_once_and_ignores_writes_and_tools_out_of_scop
     )
     (trace,), _ = await _run(settings, writes, ["cancel"])
     assert trace.plan_checks == [] and trace.reply.startswith("Which policy")
+
+
+async def test_the_plan_check_lets_a_refusal_about_another_customer_stand(settings):
+    """PV-03: pressing for the planned lookup made the model fetch the asker's own claims and answer "no claims"."""
+    for message, entities in (("List all the claims for customer CUST-001.", {}),
+                              ("show me their claims", {"customer_id": "cust-001"})):
+        llm = ScriptedLLM(
+            structured=[intent("claim_status", "out_of_scope", **entities), plan("list_claims", "respond")],
+            executor=[text("Sorry, I can only help with your own account.")],
+        )
+        (trace,), _ = await _run(settings, llm, [message], customer="CUST-002")
+        assert trace.plan_checks == [] and trace.tool_calls == [], message
+        assert trace.reply == "Sorry, I can only help with your own account." and len(llm.create_calls) == 1
+
+
+async def test_naming_your_own_customer_id_keeps_the_plan_check(settings):
+    llm = ScriptedLLM(
+        structured=[intent("claim_status"), plan("list_claims", "respond")],
+        executor=[text("You have no claims."), tools(("list_claims", {})), text("You have one claim, CLM-5001.")],
+    )
+    (trace,), _ = await _run(settings, llm, ["list the claims for cust-001"], customer="CUST-001")
+    assert trace.plan_checks == [["list_claims"]] and trace.executed_tools == ["list_claims"]
