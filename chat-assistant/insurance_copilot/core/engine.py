@@ -23,7 +23,7 @@ from typing import Any, Awaitable, Callable
 from insurance_copilot.backend.db import MIN_DRIVER_AGE, age_on
 from insurance_copilot.config import Settings
 from insurance_copilot.core.intents import ALL_INTENTS
-from insurance_copilot.core.llm import LLM, StructuredOutputError
+from insurance_copilot.core.llm import LLM, ContentFilterError, StructuredOutputError
 from insurance_copilot.core.prompts import (
     EXECUTOR_SYSTEM, PLANNER_SYSTEM, REP_EXECUTOR_SYSTEM, REP_PLANNER_SYSTEM, REP_ROUTER_SYSTEM, ROUTER_SYSTEM,
 )
@@ -36,6 +36,8 @@ ConfirmFn = Callable[[ConfirmationRequest], Awaitable[bool] | bool]
 EventFn = Callable[[Event], Awaitable[None] | None]
 
 MAX_TOOL_RESULT_CHARS = 20_000
+CONTENT_FILTER_REPLY = ("I'm sorry, I can't help with that request. I can help with your own policies, billing, "
+                        "claims and quotes.")
 CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
 OTHER_ACCOUNT_ENTITY = "account_holder"  # set by the router when the message is about someone else's account
 
@@ -98,10 +100,16 @@ class CopilotSession:
         await self._emit("turn_started", {"turn": trace.turn, "user_message": text})
         try:
             await self._run_turn(trace)
-        except Exception as exc:  # surface to UI and trace, keep the session usable
+        except ContentFilterError:
+            # The provider refused the message itself (e.g. a prompt injection caught by Azure's content filter): a
+            # refusal, not a failure, so no "try again" and none of the provider's wording reaches the customer.
+            trace.stop_reason = "refusal"
+            trace.reply = CONTENT_FILTER_REPLY
+        except Exception as exc:  # keep the session usable; the detail goes to the trace, never to the customer
             trace.error = f"{type(exc).__name__}: {exc}"
             trace.reply = trace.reply or "Sorry, something went wrong on my side. Please try again."
-            await self._emit("error", {"message": trace.error})
+            await self._emit("error", {"message": f"Something went wrong (turn {trace.turn}); the details are in the "
+                                                  "conversation's trace."})
         self.transcript.append(("customer", text))
         self.transcript.append(("assistant", trace.reply))
         await self._emit("assistant_message", {"text": trace.reply})

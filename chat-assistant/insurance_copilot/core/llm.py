@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from harbor_llm import LLM, StructuredOutputError, describe, strict_schema
+from harbor_llm import LLM, ContentFilterError, StructuredOutputError, describe, strict_schema
 from harbor_llm import make_llm as _factory
 
 from insurance_copilot.config import Settings
 
 APP_PROVIDER_VAR = "CHAT_LLM_PROVIDER"
 
-__all__ = ["APP_PROVIDER_VAR", "LLM", "StructuredOutputError", "describe", "make_llm", "strict_schema"]
+__all__ = ["APP_PROVIDER_VAR", "LLM", "ContentFilterError", "StructuredOutputError", "describe", "make_llm", "strict_schema"]
 
 
 def make_llm(settings: Settings | None = None, **kwargs: Any) -> Any:

@@ -22,6 +22,11 @@ class StructuredOutputError(RuntimeError):
     """The model did not return valid structured output (refused, truncated or malformed)."""
 
 
+class ContentFilterError(RuntimeError):
+    """The provider refused the request itself (e.g. Azure OpenAI's content filter rejected the prompt): no model
+    output exists. Callers should answer with a refusal, not an error, and never show the provider's message."""
+
+
 class ConfigError(ValueError):
     """The selected provider is missing a setting or an SDK."""
 

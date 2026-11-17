@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 from harbor_llm.types import (
+    ContentFilterError,
     LLMResponse,
     StructuredOutputError,
     T,
@@ -30,6 +31,20 @@ FINISH_TO_STOP = {
     "content_filter": "refusal",
     "function_call": "tool_use",
 }
+
+
+def prompt_filtered(exc: BaseException) -> bool:
+    """The provider rejected the request with its content filter (Azure OpenAI: HTTP 400, code ``content_filter``),
+    read from the error's code, never from its message text."""
+    if getattr(exc, "code", None) == "content_filter":
+        return True
+    body = getattr(exc, "body", None)
+    err = body.get("error", body) if isinstance(body, dict) else None
+    return isinstance(err, dict) and err.get("code") == "content_filter"
+
+
+def _refused(exc: Exception) -> ContentFilterError:
+    return ContentFilterError("The provider's content filter refused the request")
 
 
 def to_openai_messages(system: str | None, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -171,7 +186,13 @@ class OpenAIChatLLM:
         kwargs["messages"] = to_openai_messages(system, messages)
         if tools:
             kwargs["tools"] = to_openai_tools(tools)
-        return from_openai_response(await self.client.chat.completions.create(**kwargs))
+        try:
+            resp = await self.client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            if prompt_filtered(exc):
+                raise _refused(exc) from exc
+            raise
+        return from_openai_response(resp)
 
     async def structured(self, *, system: str, user: str, schema: type[T], effort: str = "medium") -> T:
         kwargs = self._base(4000)
@@ -185,6 +206,8 @@ class OpenAIChatLLM:
                 },
             )
         except Exception as exc:
+            if prompt_filtered(exc):
+                raise _refused(exc) from exc
             if "response_format" not in str(exc) and "json_schema" not in str(exc):
                 raise
             kwargs["messages"][0]["content"] = (

@@ -10,6 +10,7 @@ from harbor_llm.factory import ALIASES, BUILDERS, describe, make_llm, resolve_pr
 from harbor_llm.types import (
     LLM,
     ConfigError,
+    ContentFilterError,
     LLMResponse,
     StructuredOutputError,
     TextBlock,
@@ -25,6 +26,7 @@ __all__ = [
     "BUILDERS",
     "LLM",
     "ConfigError",
+    "ContentFilterError",
     "LLMResponse",
     "StructuredOutputError",
     "TextBlock",
