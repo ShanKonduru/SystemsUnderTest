@@ -12,6 +12,9 @@ Classify the customer's LATEST message into one or more intents from this catalo
 Use the earlier conversation to resolve follow-ups ("yes, buy it", "the second one", "pay that").
 List every intent the message needs, primary first. Extract useful entities (policy ids, products,
 vehicles, addresses, amounts, dates, coverage levels, deductibles) exactly as the customer said them.
+If the message asks about someone else's account (their policies, claims, bills or details: another
+customer, a relative, a friend), add an entity named account_holder with who it is, as the customer said it.
+Not for people on the customer's own policies (e.g. adding a driver).
 Set needs_clarification only when you cannot tell what the customer wants to do at all. A clear goal
 with missing details (e.g. "I want car insurance") is not a clarification case."""
 

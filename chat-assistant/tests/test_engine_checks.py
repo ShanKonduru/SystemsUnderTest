@@ -71,18 +71,23 @@ async def test_the_plan_check_asks_once_and_ignores_writes_and_tools_out_of_scop
     assert trace.plan_checks == [] and trace.reply.startswith("Which policy")
 
 
-async def test_the_plan_check_lets_a_refusal_about_another_customer_stand(settings):
-    """PV-03: pressing for the planned lookup made the model fetch the asker's own claims and answer "no claims"."""
-    for message, entities in (("List all the claims for customer CUST-001.", {}),
-                              ("show me their claims", {"customer_id": "cust-001"})):
+async def test_a_question_about_someone_elses_account_gets_no_plan_and_no_plan_check(settings):
+    """PV-03/PV-04: a planned lookup (and the plan check pressing for it) made the model fetch the asker's own
+    claims or bills and answer "no claims" / "nothing owed" instead of refusing."""
+    for message, entities, who in (
+        ("List all the claims for customer CUST-001.", {}, "CUST-001"),
+        ("show me their claims", {"customer_id": "cust-001"}, "CUST-001"),
+        ("How much does Indu owe on her car insurance?", {"account_holder": "Indu"}, "Indu"),
+    ):
         llm = ScriptedLLM(
-            structured=[intent("claim_status", "out_of_scope", **entities), plan("list_claims", "respond")],
-            executor=[text("Sorry, I can only help with your own account.")],
+            structured=[intent("billing", "out_of_scope", **entities)],  # the planner is not asked
+            executor=[text("Sorry, I can't share another person's information.")],
         )
         (trace,), _ = await _run(settings, llm, [message], customer="CUST-002")
-        assert trace.plan_checks == [] and trace.tool_calls == [], message
-        assert trace.reply == "Sorry, I can only help with your own account." and len(llm.create_calls) == 1
-
+        assert trace.plan is None and trace.plan_checks == [] and trace.tool_calls == [], message
+        assert trace.reply.startswith("Sorry, I can't share") and len(llm.create_calls) == 1
+        note = llm.create_calls[0]["messages"][-1]
+        assert note["role"] == "system" and f"someone else's account ({who})" in note["content"], message
 
 async def test_naming_your_own_customer_id_keeps_the_plan_check(settings):
     llm = ScriptedLLM(
@@ -91,3 +96,4 @@ async def test_naming_your_own_customer_id_keeps_the_plan_check(settings):
     )
     (trace,), _ = await _run(settings, llm, ["list the claims for cust-001"], customer="CUST-001")
     assert trace.plan_checks == [["list_claims"]] and trace.executed_tools == ["list_claims"]
+    assert "someone else's account" not in llm.create_calls[0]["messages"][-1]["content"]

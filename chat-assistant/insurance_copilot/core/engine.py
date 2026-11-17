@@ -37,6 +37,7 @@ EventFn = Callable[[Event], Awaitable[None] | None]
 
 MAX_TOOL_RESULT_CHARS = 20_000
 CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
+OTHER_ACCOUNT_ENTITY = "account_holder"  # set by the router when the message is about someone else's account
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -124,8 +125,9 @@ class CopilotSession:
         trace.selected_tools = self.toolbox.tools_for_intents(trace.intent.intents)
         await self._emit("tools_selected", {"tools": trace.selected_tools})
 
-        # 3. Plan
-        if trace.selected_tools:
+        # 3. Plan. Not for a question about someone else's account: the tools only reach this customer's, and a
+        # planned lookup (or the plan check pressing for one) turned refusals into "you have no claims/balance".
+        if trace.selected_tools and not self._other_account_holder(trace):
             trace.plan = await self._plan(trace.user_message, trace.intent, trace.selected_tools)
             await self._emit("plan", trace.plan.model_dump())
 
@@ -175,6 +177,12 @@ class CopilotSession:
                  else f"Signed in: representative {self.customer_id} (staff). Customer tools act for the customer "
                       "they verified with verify_customer, if any.\n" if self.is_rep
                  else "")
+        other = self._other_account_holder(trace)
+        if other:
+            guest += (f"This message asks about someone else's account ({other}). Your tools only reach this "
+                      "customer's own account, so don't look anything up for it: say you can't share another "
+                      "person's information and offer help with their own account. Handle any other request in the "
+                      "message as usual.\n")
         return (
             f"Today's date: {self.settings.today.isoformat()}\n"
             f"{guest}"
@@ -276,9 +284,8 @@ class CopilotSession:
     def _skipped_reads(self, trace: TurnTrace) -> list[str]:
         """Read-only tools in scope that this turn's plan names but that never ran.
 
-        None when the customer asked about another customer's account: the tools are bound to the signed-in
-        customer, so a lookup can't answer that, and pressing for one turned a refusal into "you have no claims"."""
-        if trace.plan is None or self._names_other_customer(trace):
+        A turn about someone else's account has no plan, so it never gets this check (see _run_turn)."""
+        if trace.plan is None:
             return []
         done = {c.name for c in trace.tool_calls if c.executed}
         out: list[str] = []
@@ -289,13 +296,17 @@ class CopilotSession:
                 out.append(s.action)
         return out
 
-    def _names_other_customer(self, trace: TurnTrace) -> bool:
-        """A customer (not a representative) named a customer id that isn't their own."""
-        if self.is_rep:
-            return False
-        said = [trace.user_message] + ([e.value for e in trace.intent.entities] if trace.intent else [])
-        ids = {m.upper() for s in said for m in CUSTOMER_ID.findall(s)}
-        return bool(ids - {self.customer_id.upper()})
+    def _other_account_holder(self, trace: TurnTrace) -> str:
+        """Whose account a customer (not a representative) asked about, if not their own; else "".
+
+        A customer id other than theirs in the message or entities, or the router's account_holder entity."""
+        if self.is_rep or trace.intent is None:
+            return ""
+        entities = trace.intent.entities
+        said = [trace.user_message] + [e.value for e in entities]
+        ids = sorted({m.upper() for s in said for m in CUSTOMER_ID.findall(s)} - {self.customer_id.upper()})
+        holders = [e.value.strip() for e in entities if e.name == OTHER_ACCOUNT_ENTITY and e.value.strip()]
+        return ", ".join(ids or holders)
 
     def _precheck(self, rec: ToolCallRecord) -> str | None:
         """Why the backend would refuse this write, known before asking the customer to approve it; or None."""

@@ -451,3 +451,14 @@ def test_seed_backlog_keeps_generated_ids(tmp_path):
     assert shan.execute("make_payment", {"policy_id": "POL-1002", "amount": 5.0,
                                          "payment_method": "card_on_file"})["request_tracking"]["transaction_id"] == "TXN-10001"
     assert _quote(InsuranceBackend(path, GUEST, TODAY))["quote_id"] == "QTE-7001"
+
+
+async def test_a_rep_naming_a_customer_still_gets_a_plan(settings, db):
+    """Naming other customers is a representative's job: the someone-else's-account guard is for customers only."""
+    llm = ScriptedLLM(structured=[rep_intent("find_customer", customer_id="CUST-002", account_holder="Indu"),
+                                  plan("search_customers", "respond")],
+                      executor=[tools(("search_customers", {"query": "CUST-002"})), text("Found Indu.")])
+    async with open_session(customer_id=SERVICE, confirm=lambda r: True, settings=settings, llm=llm) as session:
+        turn = await session.send("Open CUST-002, Indu")
+    assert turn.plan is not None and [c.name for c in turn.tool_calls] == ["search_customers"]
+    assert "someone else's account" not in json.dumps(llm.create_calls[0]["messages"])
