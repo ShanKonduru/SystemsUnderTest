@@ -59,13 +59,15 @@ Use get_billing / list_payments for the policy in the task. If the task also ask
 billing facts hand the claim part to the claims specialist (handoff_to_claims) and combine both answers.
 If a billing tool fails: do not guess, do not hand off, and do not explain the claim. Call open_case for a human to
 follow up, then report that the billing information is unavailable and the case id open_case returned.
+Open a case only for a failed billing tool: if the claims specialist reports a failure, give the billing facts and
+say the claim information is unavailable, without opening a case.
 Report only facts the tools returned, with every amount and date they returned."""
 
 CLAIMS_SYSTEM = """You are the claims specialist of Harbor Mutual's member desk, acting for one member. You report to
 another agent, not to the member: nobody can answer a question from you, so never ask one or offer options.
 Use get_claim (or list_claims if no claim id is given) and explain the claim's status and amounts, including the
-adjuster's note. If a claims tool fails, do not guess: report that the claim information is unavailable, and do not
-say a case was opened. Report only facts the tools returned, with every amount they returned."""
+adjuster's note. If a claims tool fails, do not guess: report that the claim information is unavailable; do not open
+a case or say one was opened. Report only facts the tools returned, with every amount they returned."""
 
 # What the host checks before an agent may finish (each check sends the model back with the reason).
 _CASE_CLAIM = re.compile(
@@ -275,6 +277,13 @@ class DeskAgent:
             reason = "a billing tool failed, so the claim part may not be handed on; call open_case and report"
             out["guards"].append({"agent": self.role, "kind": "blocked", "action": block.name, "reason": reason})
             return {"type": "tool_result", "tool_use_id": block.id, "content": f"Refused: {reason}.", "is_error": True}
+        if block.name == "open_case" and self._case_unwarranted(out):
+            reason = (
+                "a case is opened only when your own billing lookup failed; report the unavailable claim "
+                "information without a case"
+            )
+            out["guards"].append({"agent": self.role, "kind": "blocked", "action": block.name, "reason": reason})
+            return {"type": "tool_result", "tool_use_id": block.id, "content": f"Refused: {reason}.", "is_error": True}
         if block.name.startswith("handoff_to_") and target in self.spec.handoffs:
             defects = self.settings.defects
             narrow = None if "no_narrowing" in defects else ROLE_PERMISSIONS.get(target)
@@ -345,8 +354,10 @@ class DeskAgent:
         return {"type": "tool_result", "tool_use_id": block.id, "content": call.result, "is_error": not call.ok}
 
     def _billing_failed(self, out: dict[str, Any]) -> bool:
+        """A billing read of billing's own failed or returned no data."""
         return any(
-            s["agent"] == "billing" and s["name"] in _BILLING_READS and not s["ok"] for s in out["steps"]
+            s["agent"] == "billing" and s["name"] in _BILLING_READS and (not s["ok"] or _no_data(s["result"]))
+            for s in out["steps"]
         )
 
     def _contained(self, out: dict[str, Any]) -> bool:
@@ -355,6 +366,13 @@ class DeskAgent:
             self.role == "billing"
             and "no_containment" not in self.settings.defects
             and self._billing_failed(out)
+        )
+
+    def _case_unwarranted(self, out: dict[str, Any]) -> bool:
+        """A case is only for a failed billing lookup of this agent's own: never for a claims failure (claims, or
+        billing after a failed handoff). Stands aside under the planted no_containment build."""
+        return "no_containment" not in self.settings.defects and not (
+            self.role == "billing" and self._billing_failed(out)
         )
 
     def _check_final(self, text: str, out: dict[str, Any]) -> str | None:
@@ -381,6 +399,14 @@ class DeskAgent:
                 "each of them."
             )
         return None
+
+
+def _no_data(result: str) -> bool:
+    """True when a tool's result is empty: blank, or an empty JSON object or list."""
+    try:
+        return not json.loads(result)
+    except json.JSONDecodeError:
+        return not result.strip()
 
 
 def _cases_opened(steps: list[dict[str, Any]]) -> list[str]:

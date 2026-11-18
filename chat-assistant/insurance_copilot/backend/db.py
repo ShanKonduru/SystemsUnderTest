@@ -1302,10 +1302,12 @@ class InsuranceBackend:
             pid = self._bind(con, q, cid, start)
             con.execute("UPDATE applications SET status='issued', decided_on=?, decided_by=? WHERE id=?",
                         (self.today.isoformat(), self.rep_label, a["id"]))
+        whose = f"new customer record {cid} (created now)" if new else f"existing customer {cid}"
         return {"policy_id": pid, "application_id": a["id"], "customer_id": cid, "new_customer": new,
                 "product_code": q["product_code"], "monthly_premium": q["monthly_premium"],
                 "start_date": start.isoformat(), "status": "issued",
-                "next_step": f"Tell the applicant their policy {pid} is issued and starts {start.isoformat()}; the "
+                "next_step": f"Tell the representative (not the applicant) that {a['id']} is issued as policy {pid} "
+                             f"under {whose}, starting {start.isoformat()}; give both ids, {pid} and {cid}. The "
                              f"first premium is billed on the start date."}
 
     def decline_application(self, application_id: str, reason: str) -> dict[str, Any]:

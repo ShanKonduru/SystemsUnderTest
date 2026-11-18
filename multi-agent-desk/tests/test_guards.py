@@ -12,7 +12,7 @@ from typing import Any
 
 from harbor_llm import LLMResponse, TextBlock, ToolUseBlock, Usage
 
-from desk.agents import DeskAgent, _cases_opened, _key_facts, _mentions
+from desk.agents import DeskAgent, _cases_opened, _key_facts, _mentions, _no_data
 from desk.policy import DeskRules, _premise
 
 
@@ -60,6 +60,27 @@ async def test_billing_that_failed_may_not_hand_on_and_must_open_a_case(settings
     assert [g["kind"] for g in out["guards"]] == ["blocked", "sent_back"]
     assert out["guards"][0]["action"] == "handoff_to_claims" and "call open_case" in reasons(out)[1]
     assert out["cases"] == ["CASE-1"] and out["output"].endswith("opened CASE-1 for a follow-up.")
+
+
+async def test_a_claims_failure_opens_no_case(settings, wiring, faults):
+    # Live DSK-CASCADE-04: billing's lookups worked, the claims handoff failed, and billing opened a case anyway
+    faults.set({"get_claim": {"mode": "error", "times": None}})
+    llm = Script(
+        [
+            ("tool", ("get_billing", {"policy_id": "POL-1002"})),
+            ("tool", ("handoff_to_claims", {"task": "Explain claim CLM-5003."})),
+            ("tool", ("open_case", {"subject": "Claim lookup failed", "details": "CLM-5003"})),
+            ("text", "POL-1002: $193.60 due on 2026-11-15. The claim information is unavailable right now."),
+        ]
+    )
+    out = await run(settings, wiring, "billing", "Why was my claim CLM-5003 lower than my bill for POL-1002?", llm)
+    assert out["cases"] == [] and "open_case" not in [s["name"] for s in out["steps"]]
+    assert out["guards"][0]["action"] == "open_case" and "own billing lookup failed" in reasons(out)[0]
+    claims = await run(
+        settings, wiring, "claims", "Explain claim CLM-5003.",
+        Script([("tool", ("open_case", {"subject": "x", "details": "y"})), ("text", "Claim CLM-5003 is unavailable.")]),
+    )
+    assert claims["cases"] == [] and claims["guards"][0]["action"] == "open_case"
 
 
 async def test_triage_may_not_claim_or_offer_a_case_nobody_opened(settings, wiring, faults):
@@ -156,3 +177,8 @@ def test_helpers_read_only_what_the_tools_really_returned():
     ) == ["$193.60", "2026-11-15"]  # fmt: skip
     assert _mentions("owe 193.60 on 2026-11-15", "$193.60") and not _mentions("owe $193", "$193.60")
     assert _mentions("due November 15", "2026-11-15") and not _mentions("due soon", "next week")
+
+
+def test_no_data_means_an_empty_result():
+    assert _no_data("{}") and _no_data("[]") and _no_data("  ") and _no_data("null")
+    assert not _no_data('{"balance_due": 0}') and not _no_data("SERVICE_UNAVAILABLE")
