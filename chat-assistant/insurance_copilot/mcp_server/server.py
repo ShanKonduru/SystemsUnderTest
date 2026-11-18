@@ -331,7 +331,8 @@ def build_server(backend: InsuranceBackend) -> MCPServer:
     @tool(annotations=DESTRUCTIVE, meta=_meta(["cancel_policy"], confirm=True, op="cancel_policy"))
     def cancel_policy(
         policy_id: PolicyId,
-        reason: Annotated[str, Field(description="Customer's reason for cancelling")],
+        reason: Annotated[str | None, Field(
+            description="The customer's reason for cancelling, if they gave one; optional, so don't ask for it")] = None,
         effective_date: Annotated[str | None, Field(
             description="Optional effective date YYYY-MM-DD; defaults to today")] = None,
         disclosure_accepted: DisclosureAccepted = None,

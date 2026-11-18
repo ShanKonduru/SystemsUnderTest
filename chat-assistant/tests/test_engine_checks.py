@@ -97,3 +97,49 @@ async def test_naming_your_own_customer_id_keeps_the_plan_check(settings):
     (trace,), _ = await _run(settings, llm, ["list the claims for cust-001"], customer="CUST-001")
     assert trace.plan_checks == [["list_claims"]] and trace.executed_tools == ["list_claims"]
     assert "someone else's account" not in llm.create_calls[0]["messages"][-1]["content"]
+
+
+async def test_a_write_on_another_customers_policy_is_refused_before_any_question(settings):
+    """PV-06: "Cancel policy POL-1002" from someone who doesn't hold it got a question first (the cancellation
+    reason) or an approval prompt. The host looks the named policy up first; one that isn't on the account (or
+    doesn't exist) gets no plan and a note to refuse straight away."""
+    for policy_id, code in (("POL-2001", "ACCESS_DENIED"), ("POL-9999", "NOT_FOUND")):
+        llm = ScriptedLLM(
+            structured=[intent("cancel_policy")],  # the planner is not asked
+            executor=[text(f"{policy_id} isn't on your account, so I can't change it.")],
+        )
+        (trace,), asked = await _run(settings, llm, [f"Cancel policy {policy_id}."], customer="CUST-001")
+        (lookup,) = trace.tool_calls
+        assert lookup.name == "get_policy_details" and lookup.arguments == {"policy_id": policy_id}
+        assert lookup.step == 0 and lookup.executed and lookup.result.startswith(code), policy_id
+        assert trace.plan is None and asked == [] and len(llm.create_calls) == 1
+        note = llm.create_calls[0]["messages"][-1]["content"]
+        assert f"someone else's account (policy {policy_id})" in note and "not even a reason" in note
+
+
+async def test_a_write_on_your_own_policy_is_planned_and_needs_no_reason(settings):
+    """SH-20: the cancellation reason is optional, so the request goes straight to the approval prompt."""
+    llm = ScriptedLLM(
+        structured=[intent("cancel_policy"), plan("cancel_policy", "respond"),
+                    intent("cancel_policy")],
+        executor=[tools(("cancel_policy", {"policy_id": "POL-1002"})), text("Not cancelled; POL-1002 remains active."),
+                  text("Still active.")],
+    )
+    first, second = (await _run(settings, llm, ["Cancel policy POL-1002.", "Cancel POL-1002 then."],
+                                customer="CUST-001", approve=False))[0]
+    lookup, cancel = first.tool_calls
+    assert lookup.name == "get_policy_details" and lookup.executed and not lookup.is_error
+    assert first.plan is not None and cancel.arguments == {"policy_id": "POL-1002"}
+    assert cancel.blocked_reason == "USER_DECLINED"
+    assert all(c.name != "get_policy_details" for c in second.tool_calls)  # already known to be theirs
+    assert "someone else's account" not in llm.create_calls[0]["messages"][-1]["content"]
+
+
+async def test_reads_guests_and_representatives_get_no_host_lookup(settings):
+    for customer, names, message in (
+        ("CUST-001", ("view_policies",), "What does POL-2001 cover?"),
+        ("GUEST-1", ("cancel_policy",), "Cancel policy POL-2001."),
+    ):
+        llm = ScriptedLLM(structured=[intent(*names), plan("respond")], executor=[text("Sorry.")])
+        (trace,), _ = await _run(settings, llm, [message], customer=customer)
+        assert trace.tool_calls == [], message

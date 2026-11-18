@@ -1612,7 +1612,8 @@ class InsuranceBackend:
                         "monthly_premium": p["monthly_premium"]},
                 "new": {"deductible": new_ded, "coverage_level": new_level, "monthly_premium": new_premium}}
 
-    def cancel_policy(self, policy_id: str, reason: str, effective_date: str | None = None) -> dict[str, Any]:
+    def cancel_policy(self, policy_id: str, reason: str | None = None,
+                      effective_date: str | None = None) -> dict[str, Any]:
         eff = date.fromisoformat(effective_date) if effective_date else self.today
         if eff < self.today:
             raise InvalidRequest("effective_date cannot be in the past")

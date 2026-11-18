@@ -39,6 +39,7 @@ MAX_TOOL_RESULT_CHARS = 20_000
 CONTENT_FILTER_REPLY = ("I'm sorry, I can't help with that request. I can help with your own policies, billing, "
                         "claims and quotes.")
 CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
+POLICY_ID = re.compile(r"\bPOL-\d+\b", re.IGNORECASE)
 OTHER_ACCOUNT_ENTITY = "account_holder"  # set by the router when the message is about someone else's account
 
 
@@ -68,6 +69,7 @@ class CopilotSession:
         self.traces: list[TurnTrace] = []
         self.turn_offset = 0                           # turns completed before a restore
         self.verified_at: datetime | None = None       # last passed verify_identity in this conversation
+        self.policy_owned: dict[str, bool] = {}        # policy id -> on this customer's account (host lookups)
         # Representatives (REP-...) get their own prompts and intents; customers' and guests' stay unchanged.
         self.is_rep = customer_id.startswith("REP-")
         self.router_system = REP_ROUTER_SYSTEM if self.is_rep else ROUTER_SYSTEM
@@ -132,6 +134,7 @@ class CopilotSession:
         # 2. Tool selection
         trace.selected_tools = self.toolbox.tools_for_intents(trace.intent.intents)
         await self._emit("tools_selected", {"tools": trace.selected_tools})
+        await self._check_named_policies(trace)
 
         # 3. Plan. Not for a question about someone else's account: the tools only reach this customer's, and a
         # planned lookup (or the plan check pressing for one) turned refusals into "you have no claims/balance".
@@ -188,9 +191,9 @@ class CopilotSession:
         other = self._other_account_holder(trace)
         if other:
             guest += (f"This message asks about someone else's account ({other}). Your tools only reach this "
-                      "customer's own account, so don't look anything up for it: say you can't share another "
-                      "person's information and offer help with their own account. Handle any other request in the "
-                      "message as usual.\n")
+                      "customer's own account, so don't look anything up for it and don't ask anything about it (not "
+                      "even a reason): say it isn't on their account, so you can't share or change it, and offer "
+                      "help with their own account. Handle any other request in the message as usual.\n")
         return (
             f"Today's date: {self.settings.today.isoformat()}\n"
             f"{guest}"
@@ -304,17 +307,48 @@ class CopilotSession:
                 out.append(s.action)
         return out
 
+    def _named(self, trace: TurnTrace, pattern: re.Pattern[str]) -> list[str]:
+        """Ids matching pattern in the customer's message or the router's entities, upper-cased, in order."""
+        said = [trace.user_message] + ([e.value for e in trace.intent.entities] if trace.intent else [])
+        return list(dict.fromkeys(m.upper() for s in said for m in pattern.findall(s)))
+
+    async def _check_named_policies(self, trace: TurnTrace) -> None:
+        """Before a signed-in customer's write turn, look up each policy id they named that isn't known yet.
+
+        A policy that isn't on their account then gets a refusal straight away, with no plan and no question
+        (such as a cancellation reason) asked first. The lookups are ordinary recorded tool calls."""
+        if self.is_rep or self.customer_id.startswith("GUEST-") or trace.intent is None:
+            return
+        lookup = "get_policy_details"
+        writes = any(self.toolbox.tools[t].requires_confirmation for t in trace.selected_tools
+                     if t in self.toolbox.tools)
+        if not writes or lookup not in self.toolbox.tools:
+            return
+        for policy_id in self._named(trace, POLICY_ID):
+            if policy_id in self.policy_owned:
+                continue
+            rec = ToolCallRecord(step=0, tool_use_id=f"host-{trace.turn}-{policy_id}", name=lookup,
+                                 arguments={"policy_id": policy_id}, in_scope=lookup in trace.selected_tools,
+                                 read_only=True, requires_confirmation=False)
+            trace.tool_calls.append(rec)
+            await self._emit("tool_call", _record_event(rec))
+            await self._run_call(rec)
+            refused = rec.is_error and (rec.access_denied or rec.result.startswith("NOT_FOUND"))
+            if rec.executed and (refused or not rec.is_error):
+                self.policy_owned[policy_id] = not refused
+
     def _other_account_holder(self, trace: TurnTrace) -> str:
         """Whose account a customer (not a representative) asked about, if not their own; else "".
 
-        A customer id other than theirs in the message or entities, or the router's account_holder entity."""
+        A customer id other than theirs in the message or entities, the router's account_holder entity, or a
+        policy id the host found is not on their account."""
         if self.is_rep or trace.intent is None:
             return ""
-        entities = trace.intent.entities
-        said = [trace.user_message] + [e.value for e in entities]
-        ids = sorted({m.upper() for s in said for m in CUSTOMER_ID.findall(s)} - {self.customer_id.upper()})
-        holders = [e.value.strip() for e in entities if e.name == OTHER_ACCOUNT_ENTITY and e.value.strip()]
-        return ", ".join(ids or holders)
+        ids = [i for i in self._named(trace, CUSTOMER_ID) if i != self.customer_id.upper()]
+        holders = [e.value.strip() for e in trace.intent.entities
+                   if e.name == OTHER_ACCOUNT_ENTITY and e.value.strip()]
+        foreign = [f"policy {p}" for p in self._named(trace, POLICY_ID) if self.policy_owned.get(p) is False]
+        return ", ".join(sorted(ids) or holders or foreign)
 
     def _precheck(self, rec: ToolCallRecord) -> str | None:
         """Why the backend would refuse this write, known before asking the customer to approve it; or None."""
