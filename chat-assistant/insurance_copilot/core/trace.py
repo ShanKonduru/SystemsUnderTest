@@ -90,6 +90,7 @@ class TurnTrace:
     clarified_early: bool = False
     completeness_checks: list[list[str]] = field(default_factory=list)  # intents the app reminded about
     plan_checks: list[list[str]] = field(default_factory=list)  # planned reads the app had run before the reply
+    id_checks: list[list[str]] = field(default_factory=list)  # ids a rep reply left out, sent back once
     error: str | None = None
 
     @property

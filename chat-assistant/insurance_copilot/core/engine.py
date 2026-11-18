@@ -41,6 +41,7 @@ CONTENT_FILTER_REPLY = ("I'm sorry, I can't help with that request. I can help w
 CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
 POLICY_ID = re.compile(r"\bPOL-\d+\b", re.IGNORECASE)
 OTHER_ACCOUNT_ENTITY = "account_holder"  # set by the router when the message is about someone else's account
+BUSINESS_ID = re.compile(r"^[A-Z]{2,5}-\d+$")  # POL-2004, CUST-004, APP-9500...; TXN- ids are left out (see below)
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -254,6 +255,18 @@ class CopilotSession:
                           "you left it out on purpose (the request isn't allowed, or you must ask the customer "
                           "something first), give the same answer again without calling it.")})
                     continue
+                # Id check (representatives): a reply that leaves out an id a write just returned, typically the
+                # new CUST- record after issue_application, is sent back once (seen when the conversation had drifted
+                # into writing to the customer: "your policy ..." with no customer id).
+                unreported = self._unreported_ids(trace, text)
+                if unreported and not trace.id_checks and step < self.settings.max_tool_steps:
+                    trace.id_checks.append(unreported)
+                    await self._emit("id_check", {"unreported_ids": unreported})
+                    self.history.append({"role": "user", "content": (
+                        "[App check - not from the representative] Your reply leaves out ids the tools just "
+                        "returned: " + ", ".join(unreported) + ". Representatives work by reference: write ONE "
+                        "complete reply to the representative (not to the customer) that names each of them.")})
+                    continue
                 trace.reply = text
                 return
 
@@ -292,6 +305,30 @@ class CopilotSession:
                    for i in self.toolbox.tools[c.name].intents}
         missing = [i for i in actionable if i not in touched and self.toolbox.tools_for_intents([i])]
         return missing if len(actionable) >= 2 else []
+
+    def _unreported_ids(self, trace: TurnTrace, reply: str) -> list[str]:
+        """Business ids (top-level *_id values) that this turn's applied writes returned and the reply doesn't name.
+
+        Representatives only. A write held for review (pending_review) is reported by its TXN- id, so it is skipped,
+        as are TXN- ids themselves (the prompt says to give the business reference instead)."""
+        if not self.is_rep:
+            return []
+        said = reply.upper()
+        out: list[str] = []
+        for c in trace.tool_calls:
+            if not c.executed or c.read_only or c.is_error:
+                continue
+            try:
+                result = json.loads(c.result)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(result, dict) or result.get("status") == "pending_review":
+                continue
+            for key, value in result.items():
+                if (key.endswith("_id") and isinstance(value, str) and BUSINESS_ID.match(value)
+                        and not value.startswith("TXN-") and value not in said and value not in out):
+                    out.append(value)
+        return out
 
     def _skipped_reads(self, trace: TurnTrace) -> list[str]:
         """Read-only tools in scope that this turn's plan names but that never ran.

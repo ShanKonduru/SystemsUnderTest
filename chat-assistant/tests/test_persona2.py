@@ -373,6 +373,43 @@ async def test_rep_engine_uses_rep_prompts(settings, db):
     assert "Signed in: representative REP-201" in json.dumps(llm.create_calls[0]["messages"])
 
 
+async def test_a_rep_reply_that_leaves_out_new_ids_is_sent_back_once(settings, db):
+    # Live RA-04: after issue_application the reply drifted into "your policy ..." and dropped the new CUST- record
+    app = _guest_application(db)
+    llm = ScriptedLLM(
+        structured=[rep_intent("work_queue"), plan("issue_application", "respond")],
+        executor=[tools(("issue_application", {"application_id": app})),
+                  text("Your renters policy is issued and starts today."),
+                  text("Still issued.")],  # ignores the reminder: the answer stands, no second check
+    )
+    async with open_session(customer_id=AGENT, confirm=lambda r: True, settings=settings, llm=llm) as session:
+        turn = await session.send(f"Issue {app}; terms accepted.")
+    issued = json.loads(turn.tool_calls[0].result)
+    assert turn.id_checks == [[issued["policy_id"], app, "CUST-004"]] and turn.reply == "Still issued."
+    reminder = llm.create_calls[2]["messages"][-1]  # calls: issue, first reply, the reply after the reminder
+    assert reminder["content"].startswith("[App check - not from the representative]")
+    assert "CUST-004" in reminder["content"] and "TXN-" not in reminder["content"]
+
+
+async def test_the_id_check_skips_held_writes_and_replies_that_name_the_ids(settings, db):
+    app = _guest_application(db)
+    held = ScriptedLLM(  # a service rep's issue is held for review: the TXN- id is the reference
+        structured=[rep_intent("work_queue"), plan("issue_application", "respond")],
+        executor=[tools(("issue_application", {"application_id": app})), text("Held for a supervisor.")],
+    )
+    async with open_session(customer_id=SERVICE, confirm=lambda r: True, settings=settings, llm=held) as session:
+        turn = await session.send(f"Issue {app}.")
+    assert turn.tool_calls[0].executed and turn.id_checks == [] and turn.reply == "Held for a supervisor."
+    named = ScriptedLLM(
+        structured=[rep_intent("work_queue"), plan("issue_application", "respond")],
+        executor=[tools(("issue_application", {"application_id": app})),
+                  text(f"{app} issued as POL-2003 under new customer CUST-004.")],
+    )
+    async with open_session(customer_id=AGENT, confirm=lambda r: True, settings=settings, llm=named) as session:
+        turn = await session.send(f"Issue {app}.")
+    assert json.loads(turn.tool_calls[0].result)["policy_id"] == "POL-2003" and turn.id_checks == []
+
+
 # ---------------------------------------------------------------- web: representatives sign in
 def test_web_representative_login(web):  # noqa: F811
     app_mod, _, _ = web
