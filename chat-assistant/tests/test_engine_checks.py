@@ -143,3 +143,39 @@ async def test_reads_guests_and_representatives_get_no_host_lookup(settings):
         llm = ScriptedLLM(structured=[intent(*names), plan("respond")], executor=[text("Sorry.")])
         (trace,), _ = await _run(settings, llm, [message], customer=customer)
         assert trace.tool_calls == [], message
+
+
+async def test_the_hosts_lookup_is_handed_to_the_model_and_never_repeated(settings):
+    """SH-06: the host looked up the policy and the model looked it up again (a duplicate call)."""
+    llm = ScriptedLLM(
+        structured=[intent("modify_policy", policy_id="POL-1001"), plan("update_policy_coverage", "respond")],
+        executor=[text("Your deductible is $500 today; I can change it to $750.")],
+    )
+    (trace,), _ = await _run(settings, llm, ["Change the deductible on my car policy to $750."], customer="CUST-001")
+    (lookup,) = trace.tool_calls
+    assert lookup.step == 0 and lookup.name == "get_policy_details"
+    note = llm.create_calls[0]["messages"][-1]["content"]
+    assert "Already looked up by the app this turn" in note and '{"policy_id": "POL-1001"}' in note
+
+
+async def test_the_models_own_lookups_mean_no_host_lookup_later(settings):
+    """A policy the model already saw (list_policies or get_policy_details) is known: no second lookup."""
+    llm = ScriptedLLM(
+        structured=[intent("view_policies"), plan("list_policies", "respond"),
+                    intent("cancel_policy", policy_id="POL-1002"), plan("cancel_policy", "respond")],
+        executor=[tools(("list_policies", {})), text("You have POL-1001 and POL-1002."),
+                  tools(("cancel_policy", {"policy_id": "POL-1002"})), text("Not cancelled; POL-1002 is still active.")],
+    )
+    (_, second), _ = await _run(settings, llm, ["What policies do I have?", "Cancel POL-1002."],
+                                customer="CUST-001", approve=False)
+    assert [c.name for c in second.tool_calls] == ["cancel_policy"]
+
+
+async def test_a_denied_lookup_by_the_model_is_remembered(settings):
+    llm = ScriptedLLM(
+        structured=[intent("view_policies"), plan("get_policy_details", "respond"), intent("cancel_policy")],
+        executor=[tools(("get_policy_details", {"policy_id": "POL-2001"})), text("That isn't on your account."),
+                  text("POL-2001 isn't on your account, so I can't cancel it.")],
+    )
+    (_, second), asked = await _run(settings, llm, ["Show POL-2001.", "Cancel POL-2001."], customer="CUST-001")
+    assert second.tool_calls == [] and second.plan is None and asked == []

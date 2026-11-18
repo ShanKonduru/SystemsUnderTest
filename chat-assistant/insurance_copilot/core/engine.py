@@ -69,7 +69,7 @@ class CopilotSession:
         self.traces: list[TurnTrace] = []
         self.turn_offset = 0                           # turns completed before a restore
         self.verified_at: datetime | None = None       # last passed verify_identity in this conversation
-        self.policy_owned: dict[str, bool] = {}        # policy id -> on this customer's account (host lookups)
+        self.policy_owned: dict[str, bool] = {}        # policy id -> on this customer's account (any lookup)
         # Representatives (REP-...) get their own prompts and intents; customers' and guests' stay unchanged.
         self.is_rep = customer_id.startswith("REP-")
         self.router_system = REP_ROUTER_SYSTEM if self.is_rep else ROUTER_SYSTEM
@@ -200,6 +200,7 @@ class CopilotSession:
             f"Detected intents: {', '.join(trace.intent.intents)}\n"
             f"Tools in scope for this turn: {', '.join(trace.selected_tools) or 'none - answer without tools'}\n"
             f"Proposed plan:\n{plan}"
+            + self._host_lookups_note(trace)
         )
 
     async def _execute(self, trace: TurnTrace) -> None:
@@ -333,9 +334,14 @@ class CopilotSession:
             trace.tool_calls.append(rec)
             await self._emit("tool_call", _record_event(rec))
             await self._run_call(rec)
-            refused = rec.is_error and (rec.access_denied or rec.result.startswith("NOT_FOUND"))
-            if rec.executed and (refused or not rec.is_error):
-                self.policy_owned[policy_id] = not refused
+
+    def _host_lookups_note(self, trace: TurnTrace) -> str:
+        """The results of the host's own lookups this turn, so the model uses them instead of repeating the call."""
+        done = [c for c in trace.tool_calls if c.step == 0 and c.executed]
+        if not done:
+            return ""
+        lines = "\n".join(f"- {c.name}({json.dumps(c.arguments)}): {c.result[:2000]}" for c in done)
+        return f"\nAlready looked up by the app this turn (use these; don't call them again):\n{lines}"
 
     def _other_account_holder(self, trace: TurnTrace) -> str:
         """Whose account a customer (not a representative) asked about, if not their own; else "".
@@ -427,7 +433,21 @@ class CopilotSession:
                 rec.result = outcome.text[:MAX_TOOL_RESULT_CHARS]
                 if rec.name == "verify_identity" and not rec.is_error and _passed(rec.result):
                     self.verified_at = datetime.now(timezone.utc)
+                self._learn_policies(rec)
         await self._emit("tool_result", _record_event(rec))
+
+    def _learn_policies(self, rec: ToolCallRecord) -> None:
+        """Remember which policy ids a lookup showed to be (or not be) on this customer's account."""
+        if self.is_rep or self.customer_id.startswith("GUEST-"):
+            return
+        if rec.name == "list_policies" and not rec.is_error:
+            for p in POLICY_ID.findall(rec.result):
+                self.policy_owned[p.upper()] = True
+        elif rec.name == "get_policy_details" and (pid := str(rec.arguments.get("policy_id", "")).upper()):
+            if not rec.is_error:
+                self.policy_owned[pid] = True
+            elif rec.access_denied or rec.result.startswith("NOT_FOUND"):
+                self.policy_owned[pid] = False
 
     def _recently_verified(self, minutes: int) -> bool:
         return bool(self.verified_at and datetime.now(timezone.utc) - self.verified_at < timedelta(minutes=minutes))
