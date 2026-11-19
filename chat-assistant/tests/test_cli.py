@@ -92,7 +92,7 @@ def test_chat_attach_approve_and_save_traces(tmp_path, monkeypatch, capsys, fake
     llm, _ = fake_session
     llm.structured_queue += [intent("billing"), plan("make_payment", "respond"),
                              intent("billing"), plan("make_payment", "respond")]
-    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20."),
+    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20 (PAY-9001)."),
                            tools(("make_payment", {"policy_id": "POL-1002", "amount": 30})), text("Not paid.")]
     proof = tmp_path / "electric bill.pdf"
     proof.write_bytes(PDF)
@@ -106,7 +106,7 @@ def test_chat_attach_approve_and_save_traces(tmp_path, monkeypatch, capsys, fake
     assert "Seeded demo database" in out
     assert "attached DOC-6001 electric bill.pdf" in out
     assert out.count("could not attach") == 2 and "Only PDF, JPG, PNG or WebP" in out
-    assert "assistant>\x1b[0m Paid $20." in out and "assistant>\x1b[0m Not paid." in out
+    assert "assistant>\x1b[0m Paid $20 (PAY-9001)." in out and "assistant>\x1b[0m Not paid." in out
     # the attachment went out with the next message only
     first, second = llm.create_calls[0]["messages"][0]["content"], llm.create_calls[2]["messages"][-2]["content"]
     assert "[Attached document DOC-6001: electric bill.pdf" in first and "Attached" not in second
@@ -121,7 +121,7 @@ def test_chat_auto_approve_and_ctrl_c(tmp_path, monkeypatch, capsys, fake_sessio
     llm, _ = fake_session
     llm.structured_queue += [intent("cancel_policy"), plan("cancel_policy", "respond")]
     llm.executor_queue += [tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold the house"})),
-                           text("Cancelled.")]
+                           text("Cancelled. Policy POL-1002 is no longer active.")]
     db = tmp_path / "cli.db"
     prompts = feed(monkeypatch, "quit")
     asyncio.run(cli.chat(args(tmp_path)))           # first run seeds the database

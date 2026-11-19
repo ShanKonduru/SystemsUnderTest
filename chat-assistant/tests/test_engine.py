@@ -170,3 +170,34 @@ async def test_a_message_that_names_a_policy_keeps_its_filter(settings):
         call = trace.tool_calls[0]
         assert call.arguments == {"policy_id": "POL-1002"} and call.host_dropped == {}, message
         assert "CLM-5001" not in call.result
+
+
+async def test_a_customer_reply_without_the_new_drivers_id_is_sent_back_once(settings):
+    llm = ScriptedLLM(
+        structured=[intent("manage_drivers"), plan("add_driver", "respond")],
+        executor=[tools(("add_driver", {"policy_id": "POL-1001", "full_name": "Sri", "date_of_birth": "2008-05-14",
+                                        "relationship": "child"})),
+                  text("Sri has been added as a driver to POL-1001."),
+                  text("Sri has been added as a driver (DRV-3002) to POL-1001.")],
+    )
+    (trace,), _ = await _run(settings, llm, ["add my daughter Sri, born May 14, 2008"])
+    assert trace.id_checks == [["DRV-3002"]] and "DRV-3002" in trace.reply
+    reminder = llm.create_calls[2]["messages"][-1]
+    assert reminder["content"].startswith("[App check - not from the customer]") and "POL-1001" not in reminder["content"]
+
+
+async def test_a_customer_needs_the_changes_own_reference_not_the_policy(settings):
+    paid = ScriptedLLM(  # the payment's own id is enough; the policy it was made on need not be repeated
+        structured=[intent("billing"), plan("make_payment", "respond")],
+        executor=[tools(("make_payment", {"policy_id": "POL-1002", "amount": 20, "payment_method": "card_on_file"})),
+                  text("Paid $20 (PAY-9001).")],
+    )
+    (trace,), _ = await _run(settings, paid, ["pay $20 on my home policy"])
+    assert trace.id_checks == [] and trace.reply == "Paid $20 (PAY-9001)."
+    cancelled = ScriptedLLM(  # nothing but the policy comes back: the policy id is the reference
+        structured=[intent("cancel_policy"), plan("cancel_policy", "respond")],
+        executor=[tools(("cancel_policy", {"policy_id": "POL-1002", "reason": "sold"})),
+                  text("Your home policy is cancelled."), text("Your home policy POL-1002 is cancelled.")],
+    )
+    (trace,), _ = await _run(settings, cancelled, ["cancel my home policy"])
+    assert trace.id_checks == [["POL-1002"]] and trace.reply.endswith("POL-1002 is cancelled.")

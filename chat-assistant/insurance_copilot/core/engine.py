@@ -263,9 +263,10 @@ class CopilotSession:
                           "you left it out on purpose (the request isn't allowed, or you must ask the customer "
                           "something first), give the same answer again without calling it.")})
                     continue
-                # Id check (representatives): a reply that leaves out an id a write just returned, typically the
-                # new CUST- record after issue_application, is sent back once (seen when the conversation had drifted
-                # into writing to the customer: "your policy ..." with no customer id).
+                # Id check: a reply that leaves out an id a write just returned is sent back once. Representatives:
+                # typically the new CUST- record after issue_application (seen when the conversation had drifted into
+                # writing to the customer). Customers: the new record's reference (DRV-, PAY-, CLM-...), which the
+                # prompt asks for but the model often drops ("Sri has been added as a driver").
                 unreported = self._unreported_ids(trace, text)
                 if unreported and not trace.id_checks and step < self.settings.max_tool_steps:
                     trace.id_checks.append(unreported)
@@ -273,7 +274,11 @@ class CopilotSession:
                     self.history.append({"role": "user", "content": (
                         "[App check - not from the representative] Your reply leaves out ids the tools just "
                         "returned: " + ", ".join(unreported) + ". Representatives work by reference: write ONE "
-                        "complete reply to the representative (not to the customer) that names each of them.")})
+                        "complete reply to the representative (not to the customer) that names each of them."
+                        if self.is_rep else
+                        "[App check - not from the customer] Your reply leaves out the reference the change just "
+                        "returned: " + ", ".join(unreported) + ". Write ONE complete reply to the customer that "
+                        "gives it, so they can quote it later.")})
                     continue
                 trace.reply = text
                 return
@@ -317,10 +322,12 @@ class CopilotSession:
     def _unreported_ids(self, trace: TurnTrace, reply: str) -> list[str]:
         """Business ids (top-level *_id values) that this turn's applied writes returned and the reply doesn't name.
 
-        Representatives only. A write held for review (pending_review) is reported by its TXN- id, so it is skipped,
-        as are TXN- ids themselves (the prompt says to give the business reference instead)."""
-        if not self.is_rep:
-            return []
+        A write held for review (pending_review) is reported by its TXN- id, so it is skipped, as are TXN- ids
+        themselves (the prompt says to give the business reference instead).
+
+        Representatives work by reference: every id counts. A customer needs the change's own reference: the first
+        id that isn't the policy or customer it was made on (PAY-, DRV-, CLM-, CHG-...), else the policy id (a
+        cancellation, a coverage change)."""
         said = reply.upper()
         out: list[str] = []
         for c in trace.tool_calls:
@@ -332,10 +339,13 @@ class CopilotSession:
                 continue
             if not isinstance(result, dict) or result.get("status") == "pending_review":
                 continue
-            for key, value in result.items():
-                if (key.endswith("_id") and isinstance(value, str) and BUSINESS_ID.match(value)
-                        and not value.startswith("TXN-") and value not in said and value not in out):
-                    out.append(value)
+            ids = [(key, value) for key, value in result.items()
+                   if key.endswith("_id") and isinstance(value, str) and BUSINESS_ID.match(value)
+                   and not value.startswith("TXN-")]
+            if not self.is_rep:
+                own = [i for i in ids if i[0] not in ("policy_id", "customer_id")]
+                ids = (own or [i for i in ids if i[0] == "policy_id"])[:1]
+            out += [v for _, v in ids if v not in said and v not in out]
         return out
 
     def _skipped_reads(self, trace: TurnTrace) -> list[str]:

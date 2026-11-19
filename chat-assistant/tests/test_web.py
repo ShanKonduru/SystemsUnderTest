@@ -81,7 +81,7 @@ def test_chat_is_saved_and_can_be_continued(web):
     app_mod, llm, store = web
     llm.structured_queue += [intent("billing"), plan("make_payment", "respond"),
                              intent("billing"), plan("get_billing", "respond")]
-    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20."),
+    llm.executor_queue += [tools(("make_payment", {"policy_id": "POL-1002", "amount": 20})), text("Paid $20 (PAY-9001)."),
                            tools(("get_billing", {"policy_id": "POL-1002"})), text("Balance is $173.60.")]
     client = TestClient(app_mod.app)
     login(client)
@@ -89,11 +89,11 @@ def test_chat_is_saved_and_can_be_continued(web):
 
     with client.websocket_connect(f"/ws?conversation={conv['id']}") as ws:
         assert ws.receive_json()["type"] == "ready"
-        assert chat_turn(ws, "pay $20 on my home policy") == "Paid $20."
+        assert chat_turn(ws, "pay $20 on my home policy") == "Paid $20 (PAY-9001)."
 
     # history and title persisted
     msgs = client.get(f"/api/conversations/{conv['id']}/messages").json()
-    assert [(m["role"], m["text"]) for m in msgs] == [("user", "pay $20 on my home policy"), ("assistant", "Paid $20.")]
+    assert [(m["role"], m["text"]) for m in msgs] == [("user", "pay $20 on my home policy"), ("assistant", "Paid $20 (PAY-9001).")]
     assert client.get("/api/conversations").json()[0]["title"] == "pay $20 on my home policy"
     traces = client.get(f"/api/conversations/{conv['id']}/traces").json()
     assert traces[0]["tool_calls"][0]["name"] == "make_payment" and traces[0]["tool_calls"][0]["confirmed"]
@@ -104,7 +104,7 @@ def test_chat_is_saved_and_can_be_continued(web):
         assert chat_turn(ws, "what is left to pay?") == "Balance is $173.60."
     resumed_request = llm.create_calls[2]["messages"]
     assert resumed_request[0] == {"role": "user", "content": "pay $20 on my home policy"}
-    assert any(m["role"] == "assistant" and m["content"][0]["text"] == "Paid $20." for m in resumed_request
+    assert any(m["role"] == "assistant" and m["content"][0]["text"] == "Paid $20 (PAY-9001)." for m in resumed_request
                if isinstance(m["content"], list) and m["content"] and m["content"][0].get("type") == "text")
     assert client.get(f"/api/conversations/{conv['id']}/traces").json()[1]["turn"] == 2
 
