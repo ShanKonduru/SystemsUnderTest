@@ -2,7 +2,8 @@
 
 Found by TruAssure's tone run (the same turn asked panicked, aggressive, jargon-heavy...):
 - under pressure the model went straight to add_driver for a 14-year-old and the customer was asked to approve a
-  change the backend refuses; the host now refuses it first, without an approval prompt;
+  change the backend refuses; the host now refuses it first, without an approval prompt (the same for a deductible or
+  coverage level that isn't offered, and a proof document of a kind a change never accepts: SH-06, IN-09);
 - under pressure the model answered "is gap cover available?" from an earlier turn's data although its plan said
   to look it up; the host now has a planned lookup run before the reply (once per turn).
 """
@@ -39,6 +40,56 @@ async def test_a_valid_or_unreadable_date_still_goes_to_the_customer(settings):
         )
         (trace,), asked = await _run(settings, llm, ["add Sri"], approve=False)
         assert len(asked) == 1 and trace.tool_calls[0].blocked_reason == "USER_DECLINED", dob
+
+
+async def test_a_deductible_that_is_not_offered_is_refused_before_any_approval_prompt(settings):
+    llm = ScriptedLLM(
+        structured=[intent("modify_policy"), plan("update_policy_coverage", "respond")],
+        executor=[tools(("update_policy_coverage", {"policy_id": "POL-1001", "deductible": 750})),
+                  text("$750 isn't an option: choose $250, $500, $1,000 or $2,000.")],
+    )
+    (trace,), asked = await _run(settings, llm, ["Change the deductible on my car policy to $750."])
+    call = trace.tool_calls[0]
+    assert asked == [] and call.blocked_reason == "INVALID_REQUEST" and not call.executed
+    assert "$750 deductible isn't offered" in call.result and "$250, $500, $1,000 and $2,000" in call.result
+
+
+async def test_a_coverage_level_that_is_not_offered_is_refused(settings):
+    llm = ScriptedLLM(
+        structured=[intent("modify_policy"), plan("update_policy_coverage", "respond")],
+        executor=[tools(("update_policy_coverage", {"policy_id": "POL-1001", "coverage_level": "gold"})),
+                  text("There is no gold level.")],
+    )
+    (trace,), asked = await _run(settings, llm, ["Make my car policy gold."])
+    assert asked == [] and trace.tool_calls[0].blocked_reason == "INVALID_REQUEST"
+    assert "basic, standard, premium" in trace.tool_calls[0].result
+
+
+async def test_a_proof_of_the_wrong_kind_is_refused_before_any_approval_prompt(settings):
+    bill = {"change_type": "date_of_birth", "new_value": "1990-10-03", "document_id": "DOC-6002",
+            "document_type": "utility_bill", "reason": "typo at sign-up"}
+    llm = ScriptedLLM(
+        structured=[intent("update_profile"), plan("submit_profile_change", "respond")],
+        executor=[tools(("submit_profile_change", bill)), text("A utility bill can't prove a date of birth.")],
+    )
+    (trace,), asked = await _run(settings, llm, ["My date of birth is wrong; electricity bill attached."])
+    call = trace.tool_calls[0]
+    assert asked == [] and call.blocked_reason == "INVALID_REQUEST" and not call.executed
+    assert "utility bill is not accepted" in call.result and "passport" in call.result
+
+
+async def test_valid_coverage_and_proof_still_go_to_the_customer(settings):
+    cases = [
+        ("modify_policy", "update_policy_coverage", {"policy_id": "POL-1001", "deductible": "$1,000"}),
+        ("update_profile", "submit_profile_change",
+         {"change_type": "date_of_birth", "new_value": "1990-10-03", "document_id": "DOC-6002",
+          "document_type": "passport", "reason": "typo"}),
+    ]
+    for intent_name, tool, args in cases:
+        llm = ScriptedLLM(structured=[intent(intent_name), plan(tool, "respond")],
+                          executor=[tools((tool, args)), text("Declined.")])
+        (trace,), asked = await _run(settings, llm, ["do it"], approve=False)
+        assert len(asked) == 1 and trace.tool_calls[0].blocked_reason == "USER_DECLINED", tool
 
 
 async def test_a_planned_lookup_runs_before_the_reply(settings):

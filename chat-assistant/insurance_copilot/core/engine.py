@@ -20,7 +20,13 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
-from insurance_copilot.backend.db import MIN_DRIVER_AGE, age_on
+from insurance_copilot.backend.db import (
+    CHANGE_TYPES,
+    COVERAGE_FACTORS,
+    DEDUCTIBLE_FACTORS,
+    MIN_DRIVER_AGE,
+    age_on,
+)
 from insurance_copilot.config import Settings
 from insurance_copilot.core.intents import ALL_INTENTS
 from insurance_copilot.core.llm import LLM, ContentFilterError, StructuredOutputError
@@ -422,6 +428,10 @@ class CopilotSession:
             if not MIN_DRIVER_AGE <= age <= 120:
                 return (f"Drivers must be at least {MIN_DRIVER_AGE}; born {dob.isoformat()}, this driver is {age} "
                         "today, so they can't be added.")
+        if rec.name == "update_policy_coverage":
+            return _coverage_problem(rec.arguments)
+        if rec.name == "submit_profile_change":
+            return _proof_problem(rec.arguments)
         return None
 
     def _make_record(self, step: int, tool_use: Any, scope: list[str], message: str = "") -> ToolCallRecord:
@@ -543,6 +553,39 @@ def _jsonable(content: Any) -> Any:
         else:
             out.append(block)
     return out
+
+
+def _money(amount: int) -> str:
+    return f"${amount:,}"
+
+
+def _coverage_problem(arguments: dict[str, Any]) -> str | None:
+    """A deductible or coverage level Harbor Mutual doesn't offer (the backend's own tables); else None."""
+    deductible, level = arguments.get("deductible"), arguments.get("coverage_level")
+    if deductible is not None:
+        try:
+            amount = int(str(deductible).replace("$", "").replace(",", "").strip())
+        except ValueError:
+            amount = None
+        if amount not in DEDUCTIBLE_FACTORS:
+            options = [_money(d) for d in DEDUCTIBLE_FACTORS]
+            return (f"A {_money(amount) if amount is not None else str(deductible)} deductible isn't offered; the "
+                    f"options are {', '.join(options[:-1])} and {options[-1]}. Ask the customer which one they want.")
+    if level is not None and str(level) not in COVERAGE_FACTORS:
+        return (f"There is no '{level}' coverage level; the options are {', '.join(COVERAGE_FACTORS)}. "
+                "Ask the customer which one they want.")
+    return None
+
+
+def _proof_problem(arguments: dict[str, Any]) -> str | None:
+    """A proof document of a type the backend never accepts for this kind of change; else None."""
+    spec = CHANGE_TYPES.get(str(arguments.get("change_type")))
+    kind = arguments.get("document_type")
+    if spec is None or not kind or kind in spec["accepted_documents"]:
+        return None  # an unknown change type or a missing document: the backend reports those itself
+    accepted = list(spec["accepted_documents"].values())
+    return (f"A {str(kind).replace('_', ' ')} is not accepted as proof for a {spec['label'].lower()} change. Accepted: "
+            f"{'; '.join(accepted)}. Ask the customer to attach one of those.")
 
 
 def _passed(result: str) -> bool:
