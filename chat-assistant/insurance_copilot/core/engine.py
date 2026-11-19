@@ -41,6 +41,14 @@ CONTENT_FILTER_REPLY = ("I'm sorry, I can't help with that request. I can help w
 CUSTOMER_ID = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
 POLICY_ID = re.compile(r"\bPOL-\d+\b", re.IGNORECASE)
 OTHER_ACCOUNT_ENTITY = "account_holder"  # set by the router when the message is about someone else's account
+# a customer's message that points at a policy: an id, the word policy, a kind of cover, or "on it"/"for that"
+POLICY_REFERENCE = re.compile(
+    r"\bPOL-\d+\b|\bpolic(?:y|ies)\b|\b(?:home|house|homeowners?|auto|car|vehicle|motor|life|renters?|condo|"
+    r"umbrella)\b|\b(?:on|for|under|about) (?:it|that|this|that one|this one)\b",
+    re.IGNORECASE,
+)
+# read tools whose policy_id only narrows a list: without it they list the whole account
+POLICY_FILTERS = {"list_claims": "policy_id"}
 BUSINESS_ID = re.compile(r"^[A-Z]{2,5}-\d+$")  # POL-2004, CUST-004, APP-9500...; TXN- ids are left out (see below)
 
 
@@ -270,7 +278,7 @@ class CopilotSession:
                 trace.reply = text
                 return
 
-            records = [self._make_record(step, tu, trace.selected_tools) for tu in tool_uses]
+            records = [self._make_record(step, tu, trace.selected_tools, trace.user_message) for tu in tool_uses]
             trace.tool_calls.extend(records)
             for rec in records:
                 await self._emit("tool_call", _record_event(rec))
@@ -406,10 +414,12 @@ class CopilotSession:
                         "today, so they can't be added.")
         return None
 
-    def _make_record(self, step: int, tool_use: Any, scope: list[str]) -> ToolCallRecord:
+    def _make_record(self, step: int, tool_use: Any, scope: list[str], message: str = "") -> ToolCallRecord:
         spec = self.toolbox.tools.get(tool_use.name)
         # Host-only arguments (consent) are never taken from the model.
         arguments = {k: v for k, v in dict(tool_use.input or {}).items() if k not in HOST_ARGUMENTS}
+        dropped = self._stale_filter(tool_use.name, arguments, message)
+        arguments = {k: v for k, v in arguments.items() if k not in dropped}
         return ToolCallRecord(
             step=step,
             tool_use_id=tool_use.id,
@@ -419,7 +429,19 @@ class CopilotSession:
             read_only=bool(spec and spec.read_only),
             requires_confirmation=bool(spec and spec.requires_confirmation),
             level=spec.effective_level(arguments) if spec else "read",
+            host_dropped=dropped,
         )
+
+    def _stale_filter(self, name: str, arguments: dict[str, Any], message: str) -> dict[str, Any]:
+        """A policy filter on a customer's account-wide list that this message gives no reason for; else {}.
+
+        "Show me my claims" lists them all. A policy the conversation was about earlier (typically a request the
+        customer just dropped: "forget the payment, show me my claims") does not narrow it; the message has to point
+        at a policy itself (an id, "policy", a kind of cover, "on it"). Representatives choose filters themselves."""
+        key = POLICY_FILTERS.get(name)
+        if self.is_rep or not key or not arguments.get(key) or POLICY_REFERENCE.search(message or ""):
+            return {}
+        return {key: arguments[key]}
 
     async def _run_call(self, rec: ToolCallRecord) -> None:
         spec = self.toolbox.tools.get(rec.name)

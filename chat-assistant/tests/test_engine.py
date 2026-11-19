@@ -147,3 +147,26 @@ async def test_single_request_clarification_is_not_flagged(settings):
                       executor=[text("What is the make, model and year of the car?")])
     (trace,), _ = await _run(settings, llm, ["I want car insurance"])
     assert trace.completeness_checks == [] and trace.reply.startswith("What is the make")
+
+
+async def test_a_dropped_requests_policy_does_not_narrow_my_claims(settings):
+    llm = ScriptedLLM(
+        structured=[intent("claim_status"), plan("list_claims", "respond")],
+        executor=[tools(("list_claims", {"policy_id": "POL-1002"})), text("Your claim CLM-5001 is approved.")],
+    )
+    (trace,), _ = await _run(settings, llm, ["Actually, forget the payment. Show me my claims instead."])
+    call = trace.tool_calls[0]
+    assert call.arguments == {} and call.host_dropped == {"policy_id": "POL-1002"}
+    assert "CLM-5001" in call.result                        # the whole account, not just the home policy
+
+
+async def test_a_message_that_names_a_policy_keeps_its_filter(settings):
+    for message in ["any claims on my home policy?", "claims on POL-1002?", "and what claims are on it?"]:
+        llm = ScriptedLLM(
+            structured=[intent("claim_status"), plan("list_claims", "respond")],
+            executor=[tools(("list_claims", {"policy_id": "POL-1002"})), text("No claims on POL-1002.")],
+        )
+        (trace,), _ = await _run(settings, llm, [message])
+        call = trace.tool_calls[0]
+        assert call.arguments == {"policy_id": "POL-1002"} and call.host_dropped == {}, message
+        assert "CLM-5001" not in call.result

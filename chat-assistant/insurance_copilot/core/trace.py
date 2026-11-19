@@ -74,6 +74,7 @@ class ToolCallRecord:
     is_error: bool = False
     access_denied: bool = False
     result: str = ""
+    host_dropped: dict[str, Any] = field(default_factory=dict)  # arguments the host removed, with their values
 
 
 @dataclass
