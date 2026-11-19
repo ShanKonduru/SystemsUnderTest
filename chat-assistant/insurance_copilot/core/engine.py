@@ -55,6 +55,16 @@ POLICY_REFERENCE = re.compile(
 )
 # read tools whose policy_id only narrows a list: without it they list the whole account
 POLICY_FILTERS = {"list_claims": "policy_id"}
+# "If I cancel my car policy today, what refund...?", "Refund if car policy cancelled today?": a question about
+# cancelling, not a request to cancel. A conditional with the customer (or the policy) as subject: "if you can, cancel
+# it" or "cancel it if that's possible" are requests and don't match.
+_ENDING = r"(?:cancel(?:l?ed|l?ing)?|stop(?:ped|ping)?|end(?:ed|ing)?|terminat(?:e|ed|ing))"
+CANCEL_QUESTION = re.compile(
+    rf"\bif\s+(?:i|we)\s+(?:were\s+to\s+|was\s+to\s+|did\s+|do\s+|decided?\s+to\s+)?{_ENDING}\b"
+    rf"|\bif\s+(?:my|our|the|this|that|it)?\s*(?:[\w-]+\s+){{0,4}}?(?:was|were|is|gets?|got)?\s*"
+    r"(?:cancell?ed|stopped|ended|terminated)\b",
+    re.IGNORECASE,
+)
 BUSINESS_ID = re.compile(r"^[A-Z]{2,5}-\d+$")  # POL-2004, CUST-004, APP-9500...; TXN- ids are left out (see below)
 
 
@@ -146,8 +156,11 @@ class CopilotSession:
             self.history.append({"role": "assistant", "content": trace.reply})
             return
 
-        # 2. Tool selection
+        # 2. Tool selection. A question about cancelling leaves cancel_policy out of scope: the planner doesn't see it
+        # and a call is refused without an approval prompt (seen: "if I cancel today, what refund?" -> cancel_policy).
         trace.selected_tools = self.toolbox.tools_for_intents(trace.intent.intents)
+        if self._cancel_question(trace):
+            trace.selected_tools = [t for t in trace.selected_tools if t != "cancel_policy"]
         await self._emit("tools_selected", {"tools": trace.selected_tools})
         await self._check_named_policies(trace)
 
@@ -203,6 +216,11 @@ class CopilotSession:
                  else f"Signed in: representative {self.customer_id} (staff). Customer tools act for the customer "
                       "they verified with verify_customer, if any.\n" if self.is_rep
                  else "")
+        if self._cancel_question(trace):
+            guest += ("This message asks what would happen if they cancelled; it is not a request to cancel, so "
+                      "cancel_policy is not available this turn. No tool calculates a cancellation refund: don't state, "
+                      "estimate or rule on a refund (not even that there would be none); say you can't work it out "
+                      "here, answer what the tools do show, and offer to cancel if they want to.\n")
         other = self._other_account_holder(trace)
         if other:
             guest += (f"This message asks about someone else's account ({other}). Your tools only reach this "
@@ -416,6 +434,11 @@ class CopilotSession:
                    if e.name == OTHER_ACCOUNT_ENTITY and e.value.strip()]
         foreign = [f"policy {p}" for p in self._named(trace, POLICY_ID) if self.policy_owned.get(p) is False]
         return ", ".join(sorted(ids) or holders or foreign)
+
+    def _cancel_question(self, trace: TurnTrace) -> bool:
+        """The message asks about cancelling ("if I cancel...") rather than asking to cancel."""
+        return bool(trace.intent and "cancel_policy" in trace.intent.intents
+                    and CANCEL_QUESTION.search(trace.user_message or ""))
 
     def _precheck(self, rec: ToolCallRecord) -> str | None:
         """Why the backend would refuse this write, known before asking the customer to approve it; or None."""

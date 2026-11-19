@@ -92,6 +92,48 @@ async def test_valid_coverage_and_proof_still_go_to_the_customer(settings):
         assert len(asked) == 1 and trace.tool_calls[0].blocked_reason == "USER_DECLINED", tool
 
 
+QUESTIONS = [
+    "If I cancel my car policy today, how much refund would I get back?",
+    "What refund would I get if I cancelled my car policy today?",
+    "If I were to cancel my auto policy today, how much would I be refunded?",
+    "Just wondering - if my car policy was cancelled today, what would come back to me as a refund?",
+    "What would the pro-rata return premium be if I cancelled my auto policy effective today?",
+    "If I stop my car insurance today, how much of my money do I get back?",
+    "Refund if car policy cancelled today?",
+]
+REQUESTS = ["Cancel my home insurance policy, please.", "If you can, cancel my car policy today.",
+            "Cancel POL-1001 if that's possible.", "Please cancel it, I'm moving abroad."]
+
+
+def test_a_question_about_cancelling_is_told_apart_from_a_request():
+    from insurance_copilot.core.engine import CANCEL_QUESTION
+    assert all(CANCEL_QUESTION.search(q) for q in QUESTIONS)
+    assert not any(CANCEL_QUESTION.search(r) for r in REQUESTS)
+
+
+async def test_a_question_about_cancelling_never_reaches_an_approval_prompt(settings):
+    llm = ScriptedLLM(
+        structured=[intent("cancel_policy", "billing"), plan("get_balance", "respond")],
+        executor=[tools(("cancel_policy", {"policy_id": "POL-1001"})),
+                  text("I can't work out a cancellation refund here. Shall I cancel it?")],
+    )
+    (trace,), asked = await _run(settings, llm, [QUESTIONS[0]])
+    call = trace.tool_calls[0]
+    assert asked == [] and call.blocked_reason == "OUT_OF_SCOPE" and not call.executed
+    assert "cancel_policy" not in trace.selected_tools
+    note = next(m["content"] for m in llm.create_calls[0]["messages"] if m["role"] == "system")
+    assert "not a request to cancel" in note and "No tool calculates a cancellation refund" in note
+
+
+async def test_a_request_to_cancel_still_goes_to_the_customer(settings):
+    llm = ScriptedLLM(
+        structured=[intent("cancel_policy"), plan("cancel_policy", "respond")],
+        executor=[tools(("cancel_policy", {"policy_id": "POL-1001"})), text("Not cancelled.")],
+    )
+    (trace,), asked = await _run(settings, llm, ["If you can, cancel my car policy today."], approve=False)
+    assert len(asked) == 1 and trace.tool_calls[0].blocked_reason == "USER_DECLINED"
+
+
 async def test_a_planned_lookup_runs_before_the_reply(settings):
     llm = ScriptedLLM(
         structured=[intent("manage_riders"), plan("list_riders", "respond")],
