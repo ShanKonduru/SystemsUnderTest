@@ -171,3 +171,79 @@ async def test_the_langgraph_build_behaves_like_the_plain_loop(settings, tmp_pat
     settings.max_steps = 2
     stuck = await run(settings, events[0], llm=LoopingLLM())
     assert stuck.outcome == "max_steps" and len(stuck.steps) == 2 and not stuck.done
+
+
+class ScriptedLLM(RulesLLM):
+    """Asks for the given tool uses one turn at a time, then finishes; triage comes from the rules."""
+
+    def __init__(self, *turns: list[tuple[str, dict[str, Any]]]) -> None:
+        super().__init__()
+        self.turns = list(turns)
+
+    async def create(self, **_: Any) -> LLMResponse:
+        if not self.turns:
+            return LLMResponse([TextBlock("done")], "end_turn", Usage(1, 1))
+        uses = [ToolUseBlock(id=f"u{i}", name=n, input=a) for i, (n, a) in enumerate(self.turns.pop(0))]
+        return LLMResponse(uses, "tool_use", Usage(1, 1))
+
+
+SETTLE = {"type": "claim.assessment_completed", "claim_id": "CLM-5004", "decision": "approve", "amount": 1500}
+LETTER = ("write_letter", {"claim_id": "CLM-5004", "kind": "approval", "body": "CLM-5004 approved: $1,500."})
+
+
+async def test_a_failed_update_ends_settlement_and_its_letter_is_never_sent(settings):
+    con = sqlite3.connect(settings.db_path)
+    con.execute("UPDATE principals SET permissions='claims:read,letters:write' WHERE id='adjuster-07'")
+    con.commit()
+    con.close()
+    llm = ScriptedLLM(
+        [("update_claim", {"claim_id": "CLM-5004", "status": "approved", "approved_amount": 1500})], [LETTER]
+    )
+    ep = await run(settings, SETTLE, llm=llm)
+    assert [s["name"] for s in ep.steps] == ["update_claim"] and not ep.steps[0]["ok"]
+    assert ep.stopped == "The procedure ended: update_claim failed."
+    assert [h["name"] for h in ep.held] == ["write_letter"] and ep.held[0]["reason"].startswith("NOT RUN")
+    assert status(settings, "CLM-5004") == "under_review"
+    assert not (settings.letters_dir / "CLM-5004-approval.txt").exists()
+
+
+async def test_a_letter_with_no_update_at_all_is_held(settings):
+    ep = await run(settings, SETTLE, llm=ScriptedLLM([LETTER]))
+    assert ep.steps == [] and ep.held[0]["reason"].startswith("REFUSED: no approval letter")
+    assert not (settings.letters_dir / "CLM-5004-approval.txt").exists() and ep.done
+
+
+async def test_settlement_approves_only_the_assessed_amount(settings):
+    llm = ScriptedLLM(
+        [("update_claim", {"claim_id": "CLM-5004", "status": "approved", "approved_amount": 1800})],
+        [("update_claim", {"claim_id": "CLM-5004", "status": "approved", "approved_amount": "lots"})],
+        [LETTER],
+    )
+    ep = await run(settings, SETTLE, llm=llm)
+    assert ep.steps == [] and len(ep.held) == 3 and "assessed amount 1500" in ep.held[0]["reason"]
+    assert status(settings, "CLM-5004") == "under_review"
+    assert not (settings.letters_dir / "CLM-5004-approval.txt").exists()
+
+
+async def test_the_assessed_amount_then_its_letter_go_through(settings):
+    llm = ScriptedLLM(
+        [("update_claim", {"claim_id": "CLM-5004", "status": "approved", "approved_amount": 1500.0})], [LETTER]
+    )
+    ep = await run(settings, SETTLE, llm=llm)
+    assert [s["ok"] for s in ep.steps] == [True, True] and status(settings, "CLM-5004") == "approved"
+    assert ep.held == [] and ep.stopped == ""
+
+
+async def test_a_claim_that_cannot_be_read_ends_intake_with_no_note(settings):
+    llm = ScriptedLLM(
+        [("get_claim", {"claim_id": "CLM-0000"})],
+        [("add_note", {"claim_id": "CLM-0000", "text": "document received"}), ("get_claim", {"claim_id": "CLM-5003"})],
+    )
+    ep = await run(settings, {"type": "claim.document_received", "claim_id": "CLM-0000"}, llm=llm)
+    assert [s["name"] for s in ep.steps] == ["get_claim"] and not ep.steps[0]["ok"]
+    assert [h["name"] for h in ep.held] == ["add_note", "get_claim"] and ep.stopped.startswith("The procedure ended")
+
+
+async def test_a_refused_payment_still_gets_its_supervisor_note(settings):
+    ep = await run(settings, {"type": "claim.payment_due", "claim_id": "CLM-5001"})
+    assert ep.stopped == "" and ep.held == [] and ep.steps[-1]["name"] == "add_note" and ep.steps[-1]["ok"]

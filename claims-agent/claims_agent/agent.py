@@ -54,7 +54,9 @@ Procedures:
 - claims_payment (payment due): get_claim, then make_payment for the approved amount. If the tool refuses (for
   example a missing permission), do not retry: add a note that the payment needs a supervisor.
 
-If a tool returns an error, do not claim it succeeded. Finish with a short summary of what changed (claim id,
+If a tool returns an error, do not claim it succeeded. A letter reports a status change that happened: if the
+update fails, write no letter. Use the event's amount exactly; if it is refused, don't approve a different amount.
+Finish with a short summary of what changed (claim id,
 new status, letters written, payments made) or, if nothing changed, why."""
 
 
@@ -83,9 +85,68 @@ class EpisodeResult:
     started: float = 0.0
     ended: float = 0.0
     llm: dict[str, str] = field(default_factory=dict)
+    # calls the model asked for that the host refused (host_refusal) or that came after the procedure ended: never
+    # sent to the tool server, so they are not steps; each is {name, args, reason}
+    held: list[dict[str, Any]] = field(default_factory=list)
+    stopped: str = ""  # why the procedure stopped early ("" when it ran to the end), see procedure_end
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def procedure_end(ep: EpisodeResult, name: str, ok: bool) -> str:
+    """A failed step the procedure can't go past: the claim couldn't be read, or (intake, settlement) its update
+    failed. Nothing after it may change anything; the model only writes its summary. A refused payment is not one:
+    the payment procedure goes on to note that it needs a supervisor."""
+    if ok:
+        return ""
+    if name == "get_claim" or (name == "update_claim" and ep.route in ("claims_intake", "claims_settlement")):
+        return f"The procedure ended: {name} failed."
+    return ""
+
+
+# a letter states a status change; it may only follow a successful update to that status in the same episode
+LETTER_STATUS = {"approval": "approved", "denial": "denied"}
+
+
+def host_refusal(ep: EpisodeResult, name: str, args: dict[str, Any]) -> str | None:
+    """The host's own checks before a tool call (the model can't talk its way past them); a reason refuses the call.
+
+    - an approval or denial letter needs a successful update_claim to that status earlier in this episode, so a
+      failed or timed-out update never leaves a letter announcing a change that did not happen;
+    - a settlement approves exactly the amount the assessment decided (the event's amount), never one the agent
+      picked after the backend refused it."""
+    if ep.stopped:
+        return f"NOT RUN: {ep.stopped} Change nothing else; write your summary now."
+    if name == "write_letter":
+        status = LETTER_STATUS.get(str(args.get("kind")))
+        claim = args.get("claim_id")
+        if status and not any(
+            s["name"] == "update_claim" and s["ok"] and s["args"].get("claim_id") == claim
+            and s["args"].get("status") == status
+            for s in ep.steps
+        ):
+            return (
+                f"REFUSED: no {args.get('kind')} letter: claim {claim} was not updated to {status!r} in this episode. "
+                "Write no letter; report that nothing changed."
+            )
+    event = ep.event
+    if (
+        name == "update_claim"
+        and args.get("status") == "approved"
+        and event.get("type") == "claim.assessment_completed"
+        and event.get("amount") is not None
+    ):
+        try:
+            same = float(args.get("approved_amount")) == float(event["amount"])
+        except (TypeError, ValueError):
+            same = False
+        if not same:
+            return (
+                f"REFUSED: approved_amount must be the assessed amount {event['amount']} from the event. "
+                "Do not approve a different amount; report that the claim was not approved and why."
+            )
+    return None
 
 
 class ToolSession(Protocol):
@@ -241,6 +302,11 @@ class ClaimsAgent:
         results = []
         for b in uses:
             start_ns = time.time_ns()
+            refusal = host_refusal(ep, b.name, dict(b.input))
+            if refusal:  # never sent: not a step the agent took
+                ep.held.append({"name": b.name, "args": dict(b.input), "reason": refusal})
+                results.append({"type": "tool_result", "tool_use_id": b.id, "content": refusal, "is_error": True})
+                continue
             call = await tools.call(b.name, dict(b.input))
             spans.tool(b.name, b.id, dict(b.input), call.ok, call.result, start_ns)
             meta = getattr(tools, "meta", {}).get(b.name, {})
@@ -256,7 +322,12 @@ class ClaimsAgent:
             }
             if not ("trace_omits_read" in self.settings.defects and b.name == "get_claim"):  # planted defect
                 ep.steps.append(step)
-            results.append({"type": "tool_result", "tool_use_id": b.id, "content": call.result, "is_error": not call.ok})
+            content = call.result
+            end = procedure_end(ep, b.name, call.ok)
+            if end:
+                ep.stopped = end
+                content += f"\n\n{end} Change nothing else (no update, letter, note or payment); write your summary now."
+            results.append({"type": "tool_result", "tool_use_id": b.id, "content": content, "is_error": not call.ok})
         return results
 
 
