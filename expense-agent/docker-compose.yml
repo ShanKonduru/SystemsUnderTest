@@ -1,0 +1,59 @@
+# Harbor Mutual expense task agent (system under test): an event-driven back-office agent with no chat.
+#   docker compose -f expense-agent/docker-compose.yml up -d --build
+#   curl -X POST http://127.0.0.1:8700/events -H "X-Principal: expense-bot" -H "Content-Type: application/json" \
+#        -d '{"event": {"type": "expense.submitted", "report_id": "ER-3001"}}'
+# The agent calls the tools over MCP (streamable HTTP). To record that traffic, point EXPENSE_TOOLS_URL at a proxy.
+# LLM settings come from the repo root's .env (DEFAULT_LLM_PROVIDER, or EXPENSE_LLM_PROVIDER for this app only).
+name: harbor-expense-agent
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: expense-agent/Dockerfile
+  image: harbor-mutual/expense-agent:dev
+  env_file:
+    - path: ${SUT_ENV_FILE:-../.env}
+      format: raw          # values used as written: a $ in a password stays a $
+      required: false
+  volumes:
+    - ./data:/app/data          # expense.db and out/notices/, readable from the host
+  restart: unless-stopped
+
+services:
+  expense-tools:
+    <<: *common
+    command: ["python", "-m", "expense_agent.tools_server", "--host", "0.0.0.0", "--port", "9700"]
+    environment:
+      EXPENSE_TODAY: ${EXPENSE_TODAY:-2026-11-03}
+      EXPENSE_TOOLS_TOKEN: ${EXPENSE_TOOLS_TOKEN:-}
+      EXPENSE_DEFECTS: ${EXPENSE_DEFECTS:-}        # test runs only: a "buggy build" (see expense_agent/defects.py)
+    ports:
+      - "127.0.0.1:${EXPENSE_TOOLS_PORT:-9700}:9700"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9700/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  expense-agent:
+    <<: *common
+    command: ["uvicorn", "expense_agent.service:app", "--host", "0.0.0.0", "--port", "8700"]
+    environment:
+      EXPENSE_TODAY: ${EXPENSE_TODAY:-2026-11-03}
+      EXPENSE_TOOLS_URL: ${EXPENSE_TOOLS_URL:-http://expense-tools:9700/mcp}
+      EXPENSE_TOOLS_TOKEN: ${EXPENSE_TOOLS_TOKEN:-}
+      EXPENSE_SANDBOX_TOKEN: ${EXPENSE_SANDBOX_TOKEN:-}
+      EXPENSE_MAX_STEPS: ${EXPENSE_MAX_STEPS:-12}
+      EXPENSE_DEFECTS: ${EXPENSE_DEFECTS:-}
+    ports:
+      - "127.0.0.1:${EXPENSE_PORT:-8700}:8700"
+    depends_on:
+      expense-tools:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8700/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3

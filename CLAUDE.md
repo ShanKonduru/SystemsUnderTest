@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repository is
 
 Demo "systems under test" (SUT) for the fictitious insurer **Harbor Mutual**, which the separate TruAssure project
-tests **black-box** (it never imports this code): four independent Python apps over HTTP, one Windows desktop app driven
+tests **black-box** (it never imports this code): five independent Python apps over HTTP, one Windows desktop app driven
 through UI Automation, plus one shared library:
 
 | Dir | Package | What it is | Ports |
@@ -13,12 +13,13 @@ through UI Automation, plus one shared library:
 | `common/harbor_llm` | `harbor_llm` (src layout) | Shared LLM factory used by every app | — |
 | `chat-assistant` | `insurance_copilot` | Customer chat: intent routing → plan → MCP tool loop, SQLite | 8000 |
 | `claims-agent` | `claims_agent` | Event-driven back-office agent, no chat; agent + MCP tool server | 8100, 9100 |
+| `expense-agent` | `expense_agent` | Event-driven expense agent, no chat, no host guards (plain model + tools); agent + MCP tool server | 8700, 9700 |
 | `multi-agent-desk` | `desk` | Triage → billing → claims agents with signed identity propagation | 8300 (triage), 9300 (tools) |
 | `automation-lab` | `automation_lab` | No-login web UI for test-script generation/execution/self-healing; **no LLM**, no `harbor_llm` dependency | 8400 |
 | `policy-desk` | C# (`PolicyDesk`) + pytest suite | Windows WinForms thick client for desktop automation, script generation and self-healing; baseline suite in pywinauto; **no LLM, no image** | — |
 
 Because TruAssure tests these apps, **behaviour visible over HTTP, tool names/arguments, seed data, response
-shapes and the planted defects are a contract**. CI publishes `ghcr.io/<owner>/harbor-{claims-agent,member-desk,chat-assistant,automation-lab}`
+shapes and the planted defects are a contract**. CI publishes `ghcr.io/<owner>/harbor-{claims-agent,expense-agent,member-desk,chat-assistant,automation-lab}`
 tagged `sha-<commit>` and `latest` on every green push to `main`; TruAssure pins a `sha-` tag.
 
 ## Commands
@@ -27,7 +28,7 @@ Each app is its own project; run commands from the app's directory. Python 3.12 
 shared factory first (editable, from the sibling path):
 
 ```bat
-cd chat-assistant            :: or claims-agent / multi-agent-desk
+cd chat-assistant            :: or claims-agent / expense-agent / multi-agent-desk
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -e ..\common\harbor_llm[all] -r requirements.txt pytest pytest-asyncio pytest-cov httpx ruff
 ```
@@ -37,6 +38,7 @@ py -3.12 -m venv .venv
 | `common/harbor_llm` | `ruff check src tests` and `mypy` (strict) | `python -m pytest -q --cov` (install with `-e ".[all,dev]"`) |
 | `chat-assistant` | `ruff check insurance_copilot tests` | `python -m pytest -q --cov --cov-fail-under=95` |
 | `claims-agent` | `ruff check claims_agent tests` | `python -m pytest -q --cov` |
+| `expense-agent` | `ruff check expense_agent tests` | `python -m pytest -q --cov` |
 | `multi-agent-desk` | `ruff check desk tests` | `python -m pytest -q --cov` |
 | `automation-lab` | `ruff check automation_lab tests` | `python -m pytest -q --cov` (install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm`) |
 | `policy-desk` | `app\build.bat` (csc, `/warnaserror+`); `ruff check screens tests tools` for the suite | `app\bin\policydesk-cli.exe --self-test`. Local only (needs a desktop): `python -m pytest` (baseline suite; install `-r requirements-test.txt`), `python tools\defect_matrix.py`, `tools\smoke.bat` |
@@ -54,24 +56,24 @@ docker compose -f claims-agent\docker-compose.yml -f claims-agent\docker-compose
 ## Architecture notes
 
 **LLM factory (`harbor_llm`).** `make_llm(override_var=...)` picks a provider from `<APP>_LLM_PROVIDER`
-(`CHAT_`/`CLAIMS_`/`DESK_`) or `DEFAULT_LLM_PROVIDER`, read from the root `.env` (copy `.env.example`). Every
+(`CHAT_`/`CLAIMS_`/`EXPENSE_`/`DESK_`) or `DEFAULT_LLM_PROVIDER`, read from the root `.env` (copy `.env.example`). Every
 provider is normalized to one Anthropic-style interface: `await llm.create(messages, system, tools, ...)` returning
 `LLMResponse` of `TextBlock`/`ToolUseBlock`, and `await llm.structured(system, user, schema=PydanticModel)`. Apps
 code only against this interface. The `SCRIPTED` provider is how everything runs offline:
 `LLM_SCRIPT=pkg.module:factory` loads an app-supplied rule-based policy (`claims_agent.policy:factory`,
-`desk.policy:factory`), or `LLM_SCRIPT_FILE` replays a JSONL of recorded responses.
+`expense_agent.policy:factory`, `desk.policy:factory`), or `LLM_SCRIPT_FILE` replays a JSONL of recorded responses.
 
 **Common app shape.** Each app = an agent loop + an MCP tool server over a SQLite system of record, with:
 - a fixed "today" (`*_TODAY`, default `2026-11-03`) so outputs are reproducible;
 - token-protected `/sandbox/status|reset` (and `/sandbox/faults` in the desk) test-control endpoints that refuse
   everything when the token env var is empty;
 - the principal passed in a header by the host, never chosen by the model (`X-Customer-Id` for chat,
-  `X-Principal` for claims and desk); the tool server enforces that principal's permissions;
+  `X-Principal` for claims, expense and desk); the tool server enforces that principal's permissions;
 - a returned "account" of the episode (route, steps/tool calls, output, done) that TruAssure compares against
   independent records (proxy logs, OTel spans, DB diffs);
 - `docker-compose.observed.yml` that splits tools into their own service and puts TruAssure's proxy image
   (`TRUASSURE_PROXY_IMAGE`) in front of them. Agents locate tools via URL env vars (`CLAIMS_TOOLS_URL`,
-  `DESK_TOOLS_URL`, `COPILOT_MCP_URL`...) so a proxy can be inserted.
+  `EXPENSE_TOOLS_URL`, `DESK_TOOLS_URL`, `COPILOT_MCP_URL`...) so a proxy can be inserted.
 
 **chat-assistant.** `core/engine.py` runs each turn: route intent (structured) → select tools whose MCP
 `meta.intents` match → plan (structured) → tool-use loop with scope enforcement, user confirmation for write
@@ -83,6 +85,11 @@ HTTP. `rest_api.py` exposes the same tools as REST. Front ends: `web/app.py` (Fa
 **claims-agent.** `agent.py`: triage to a route, then a tool loop over MCP streamable HTTP to `tools_server.py`.
 Two interchangeable engines, `CLAIMS_ENGINE=loop|langgraph` (`graph.py`), must stay in parity (a test checks it).
 `telemetry.py` emits OTel GenAI spans independent of the agent's own account.
+
+**expense-agent.** Same shape as claims-agent (`agent.py` triage then tool loop, `tools_server.py` with
+`PrincipalRouter`, `policy.py` scripted policy) but deliberately plain: no LangGraph engine, no OTel, and no host
+guards (no `host_refusal`/`procedure_end`/`held`/`stopped`); whatever the model asks for is sent to the tools.
+Notices are files under `EXPENSE_OUT/notices/`. The seed reports ER-3001..ER-3010 are a contract (see its README).
 
 **multi-agent-desk.** One image, four roles (`desk.service:triage_app|billing_app|claims_app` factories +
 `desk.tools_server`). `identity.py` signs tokens; each handoff re-signs with the chain extended and permissions
@@ -112,7 +119,7 @@ control. The locator map must match what native UIA3 really reports (verify with
 AutomationIds, so it passes on v1 and breaks on v2–v4. Every planted defect needs a test marked
 `@pytest.mark.catches("<defect>")`, and `tools/defect_matrix.py` (which reads the defect list from the app) must pass.
 
-**Planted defects.** `CLAIMS_DEFECTS` / `DESK_DEFECTS` / `LAB_DEFECTS` / `POLICYDESK_DEFECTS` (comma-separated; see `defects.py` in each app, `app/Defects.cs` in policy-desk) switch on
+**Planted defects.** `CLAIMS_DEFECTS` / `EXPENSE_DEFECTS` / `DESK_DEFECTS` / `LAB_DEFECTS` / `POLICYDESK_DEFECTS` (comma-separated; see `defects.py` in each app, `app/Defects.cs` in policy-desk) switch on
 deliberate bugs so TruAssure can prove it catches them. Unknown names are errors. They must stay off by default
 and keep doing exactly what their READMEs describe. The chat assistant also has two known bugs pinned as strict
 `xfail` tests — fixing one will flip the xfail to a failure, so update the test deliberately.
