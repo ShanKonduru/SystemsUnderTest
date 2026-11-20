@@ -1,0 +1,70 @@
+name: publish expense agent
+
+# Publishes expense-agent to PyPI as harbor-expense-agent (the wheel carries common/harbor_llm), so TruVelocity's
+# practice project can run the agent without Docker: pip install harbor-expense-agent; tv practice-agent.
+# Trusted publishing (OIDC): no API token is stored anywhere. Runs on a tag expense-agent-v<version> (the version in
+# expense-agent/expense_agent/__init__.py) or by hand. PyPI side: a (pending) trusted publisher for project
+# "harbor-expense-agent", owner ShanKonduru, repository SystemsUnderTest, workflow "publish-expense-agent.yml",
+# environment "pypi".
+
+on:
+  push:
+    tags: ["expense-agent-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expense-agent
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist
+      - name: a tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION=$(python -c "import re,pathlib;print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('expense_agent/__init__.py').read_text())[1])")
+          test "${GITHUB_REF_NAME#expense-agent-v}" = "$VERSION" || { echo "tag $GITHUB_REF_NAME does not match version $VERSION"; exit 1; }
+      - name: smoke-test the wheel in a clean venv (offline model, one event end to end)
+        run: |
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          mkdir -p /tmp/run && cd /tmp/run
+          printf 'DEFAULT_LLM_PROVIDER=SCRIPTED\nLLM_SCRIPT=expense_agent.policy:factory\n' > .env
+          /tmp/wheel-venv/bin/harbor-expense-agent --version
+          /tmp/wheel-venv/bin/harbor-expense-agent > agent.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8700/healthz && break; sleep 1; done
+          curl -sf -X POST http://127.0.0.1:8700/events -H "X-Principal: expense-bot" -H "Content-Type: application/json" \
+               -d '{"event": {"type": "expense.submitted", "report_id": "ER-3001"}}' | tee reply.json
+          grep -q 'approved for \$342.50' reply.json
+          test -f data/out/notices/NTC-7001.txt
+          kill %1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: dist
+          path: expense-agent/dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/harbor-expense-agent/
+    permissions:
+      id-token: write   # trusted publishing
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3

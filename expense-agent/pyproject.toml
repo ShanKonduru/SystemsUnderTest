@@ -1,8 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+# The wheel is published to PyPI (publish-expense-agent.yml), so TruVelocity's practice project can run this agent
+# without Docker. It carries the shared LLM factory (common/harbor_llm) inside it: one package to install.
 [project]
 name = "harbor-expense-agent"
-version = "0.1.0"
-description = "Harbor Mutual expense task agent (demo system under test): event-driven, MCP tools, SQLite, notices."
+dynamic = ["version"]
+description = "Harbor Mutual expense task agent (fictitious demo system under test): event-driven, MCP tools, SQLite, notices."
+readme = "PYPI.md"
 requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "mcp>=2.3",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# the LLM SDKs (none is needed for DEFAULT_LLM_PROVIDER=SCRIPTED, the offline rule-based model)
+anthropic = ["anthropic>=1.0"]
+openai = ["openai>=1.50"]            # OpenAI, Azure OpenAI, Ollama, any OpenAI-compatible endpoint
+bedrock = ["boto3>=1.35"]
+gemini = ["google-genai>=1.30"]      # Gemini API and Vertex AI
+all = ["anthropic>=1.0", "openai>=1.50", "boto3>=1.35", "google-genai>=1.30"]
+
+[project.scripts]
+harbor-expense-agent = "expense_agent.cli:main"
+
+[project.urls]
+Source = "https://github.com/ShanKonduru/SystemsUnderTest/tree/main/expense-agent"
+
+[tool.hatch.version]
+path = "expense_agent/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["expense_agent"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"../common/harbor_llm/src/harbor_llm" = "harbor_llm"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

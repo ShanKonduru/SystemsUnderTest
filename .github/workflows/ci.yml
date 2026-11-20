@@ -98,6 +98,11 @@ jobs:
         run: ruff check expense_agent tests
       - name: offline tests + 95% coverage gate
         run: python -m pytest -q --cov
+      - name: the PyPI wheel builds (it carries harbor_llm)
+        run: |
+          python -m pip install build
+          python -m build --wheel --outdir /tmp/expense-dist
+          python -m zipfile -l /tmp/expense-dist/*.whl | grep -q "harbor_llm/factory.py"
       - name: docker images build
         run: docker compose build
 

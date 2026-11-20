@@ -20,7 +20,9 @@ through UI Automation, plus one shared library:
 
 Because TruAssure tests these apps, **behaviour visible over HTTP, tool names/arguments, seed data, response
 shapes and the planted defects are a contract**. CI publishes `ghcr.io/<owner>/harbor-{claims-agent,expense-agent,member-desk,chat-assistant,automation-lab}`
-tagged `sha-<commit>` and `latest` on every green push to `main`; TruAssure pins a `sha-` tag.
+tagged `sha-<commit>` and `latest` on every green push to `main`; TruAssure pins a `sha-` tag. `expense-agent` is also on PyPI as
+`harbor-expense-agent` (wheel carries `harbor_llm`; console command `harbor-expense-agent`), published by
+`publish-expense-agent.yml` on a tag `expense-agent-v<version>`: TruVelocity's `tv practice-agent` runs it without Docker.
 
 ## Commands
 

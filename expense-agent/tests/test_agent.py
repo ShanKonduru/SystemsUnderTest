@@ -58,6 +58,7 @@ async def test_every_submitted_seed_report_reaches_its_outcome(settings, rid, ex
     assert f"Report {rid} {expected}" in ep.output and ep.llm == {"provider": "SCRIPTED", "model": "expense-rules"}
     if expected == "approved":
         assert query(settings, "SELECT approved_amount FROM reports WHERE id=?", rid) == [(342.5,)]
+        assert "approved for $342.50" in ep.output  # the reply names the amount, as the procedure asks
     assert query(settings, "SELECT COUNT(*) FROM reimbursements") == [(0,)]
 
 

@@ -53,6 +53,23 @@ active), EMP-103 Chen Li (Sales, **left**), managers EMP-200 Dana Park and EMP-2
 | ER-3009 | Ben | submitted | 60.00 | other 60.00 dated 2026-08-20 (75 days old) | rejected (outside the window) + rejection |
 | ER-3010 | Asha | paid (120.00) | 120.00 | lodging 120.00 | history: a payment_due must not pay it again |
 
+## Run it without Docker (PyPI)
+
+The agent is published to PyPI as `harbor-expense-agent` (the wheel carries `harbor_llm`; built and published by
+`.github/workflows/publish-expense-agent.yml` on a tag `expense-agent-v<version>`):
+
+```bat
+pip install "harbor-expense-agent[all]"
+harbor-expense-agent
+```
+
+It starts the tool server (`:9700`) and the agent (`:8700`), reads `.env` in the current folder and keeps its records in
+`.\data` (`--data`); `--tools-url http://127.0.0.1:9710/mcp` puts a recording proxy between them; Ctrl+C stops both.
+TruVelocity's practice project starts it with its own proxy: `tv practice-agent`.
+
+No LLM key: `DEFAULT_LLM_PROVIDER=SCRIPTED` with `LLM_SCRIPT=expense_agent.policy:factory` (the offline rule-based model;
+the planted defects still apply). Then `pip install harbor-expense-agent` is enough (no SDK extras).
+
 ## Run it on Docker Desktop
 
 ```bat

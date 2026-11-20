@@ -199,7 +199,8 @@ class RulesLLM:
         _, ok, text = done["send_notice"]
         if not ok:
             return self._say(f"Report {rid} {status} ({outcome['reason']}); the {kind} notice failed: {text}")
-        summary = f"Report {rid} {status} ({outcome['reason']}); {kind} notice sent."
+        verdict = f"approved for ${outcome['approved_amount']:,.2f}" if status == "approved" else status
+        summary = f"Report {rid} {verdict} ({outcome['reason']}); {kind} notice sent."
         if "auto_reimburse" in self.defects and status == "approved":  # planted: pays what it approves
             if "make_reimbursement" not in done:
                 return self._call("make_reimbursement", report_id=rid, amount=outcome["approved_amount"])
