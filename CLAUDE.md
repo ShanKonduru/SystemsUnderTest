@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repository is
 
 Demo "systems under test" (SUT) for the fictitious insurer **Harbor Mutual**, which the separate TruAssure project
-tests **black-box** (it never imports this code): five independent Python apps over HTTP, one Windows desktop app driven
-through UI Automation, plus one shared library:
+tests **black-box** (it never imports this code): six independent Python apps over HTTP, one Windows desktop app driven
+through UI Automation, plus one shared library. `rca-lab/` holds the tickets for the RCA agent, whose target is
+`billing-service`:
 
 | Dir | Package | What it is | Ports |
 |---|---|---|---|
@@ -17,6 +18,7 @@ through UI Automation, plus one shared library:
 | `multi-agent-desk` | `desk` | Triage → billing → claims agents with signed identity propagation | 8300 (triage), 9300 (tools) |
 | `automation-lab` | `automation_lab` | No-login web UI for test-script generation/execution/self-healing; **no LLM**, no `harbor_llm` dependency | 8400 |
 | `policy-desk` | C# (`PolicyDesk`) + pytest suite | Windows WinForms thick client for desktop automation, script generation and self-healing; baseline suite in pywinauto; **no LLM, no image** | — |
+| `billing-service` | `billing` + TypeScript `portal/` | Premiums, installments, payments, renewals, refunds (FastAPI, SQLite) and the member portal's billing page; the RCA agent's target, defects planted in **git history**; **no LLM**, no `harbor_llm` dependency | 8500 |
 
 Because TruAssure tests these apps, **behaviour visible over HTTP, tool names/arguments, seed data, response
 shapes and the planted defects are a contract**. CI publishes `ghcr.io/<owner>/harbor-{claims-agent,expense-agent,member-desk,chat-assistant,automation-lab,billing-service}`
@@ -44,6 +46,8 @@ py -3.12 -m venv .venv
 | `multi-agent-desk` | `ruff check desk tests` | `python -m pytest -q --cov` |
 | `automation-lab` | `ruff check automation_lab tests` | `python -m pytest -q --cov` (install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm`) |
 | `policy-desk` | `app\build.bat` (csc, `/warnaserror+`); `ruff check screens tests tools` for the suite | `app\bin\policydesk-cli.exe --self-test`. Local only (needs a desktop): `python -m pytest` (baseline suite; install `-r requirements-test.txt`), `python tools\defect_matrix.py`, `tools\smoke.bat` |
+| `billing-service` | `ruff check billing tests` (`billing/_vendor` excluded) | `python -m pytest -q --cov`; portal: `cd portal && npm test` (`node --test` on the `.ts` sources, Node 24+, no packages; `node build.mjs` builds `dist/` for `/portal`). Install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm` |
+| `rca-lab` | — | `billing-service\.venv\Scripts\python rca-lab\selfcheck.py` (needs the private answer key; `--only T01,T02`, `--no-suite`) |
 
 Single test: `python -m pytest tests/test_engine.py::test_name -q`. All tests are offline (scripted LLM, no keys);
 pytest uses `asyncio_mode = "auto"`, so async tests need no decorator.
@@ -121,8 +125,27 @@ control. The locator map must match what native UIA3 really reports (verify with
 AutomationIds, so it passes on v1 and breaks on v2–v4. Every planted defect needs a test marked
 `@pytest.mark.catches("<defect>")`, and `tools/defect_matrix.py` (which reads the defect list from the app) must pass.
 
+**billing-service and rca-lab.** Design: `docs/rca-agent-test-application.md`. A FastAPI service (`billing/api.py`,
+`python -m billing`) with one module per business area (`premiums`, `installments`/`dates`, `payments`, `reminders`,
+`renewals`, `refunds`, `rates`, `taxes`), settings in `config/billing.yaml`, rates in `reference/rate_tables.csv`, a
+vendored third-party holiday calendar in `billing/_vendor/holidaycal/` (excluded from lint and coverage), and the
+portal's money/date formatting and billing page in TypeScript under `portal/`. Business rules are specs in
+`docs/specs/` (BR-xx, RF-xx, PD-xx); owners are in `CODEOWNERS`. `BILLING_TODAY` (default `2026-11-03`) and
+`BILLING_SANDBOX_TOKEN` work like the other apps'; payments are dated in the billing timezone, never the machine's `TZ`.
+Unlike the other apps its defects are **not** env-flag switches: they were slipped into ordinary feature commits
+between the release tags `billing-service-v1.0.0` (clean) → `v1.1.0` → `v1.2.0`, so the RCA agent can find them with
+`git log`/`blame`. Hence:
+- `main`'s history is append-only (never rewrite, rebase or force-push), and don't "fix" a planted defect, add a test
+  that catches one, or describe one in a commit message, comment or doc. The shipped suite and CI stay green with the
+  defects in place. A new release needs a version bump (`pyproject.toml`, `CHANGELOG.md`) and a
+  `billing-service-v<version>` tag.
+- The repo is **public** and the agent reads it: the answer key and hidden tests live only in the git-ignored
+  `rca-lab/private/` (or `RCA_LAB_KEY_PATH`) and are never committed. `rca-lab/tickets/*.md` are the public ticket
+  texts (filed as GitHub issues labelled `rca-lab`); `selfcheck.py` proves each key entry against the tagged
+  history in a temporary worktree.
+
 **Planted defects.** `CLAIMS_DEFECTS` / `EXPENSE_DEFECTS` / `DESK_DEFECTS` / `LAB_DEFECTS` / `POLICYDESK_DEFECTS` (comma-separated; see `defects.py` in each app, `app/Defects.cs` in policy-desk) switch on
-deliberate bugs so TruAssure can prove it catches them. Unknown names are errors. They must stay off by default
+deliberate bugs so TruAssure can prove it catches them (billing-service is the exception, see above). Unknown names are errors. They must stay off by default
 and keep doing exactly what their READMEs describe. The chat assistant also has two known bugs pinned as strict
 `xfail` tests — fixing one will flip the xfail to a failure, so update the test deliberately.
 
