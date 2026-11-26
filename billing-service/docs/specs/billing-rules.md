@@ -78,6 +78,12 @@ a **$10.00 late fee**. Partial and over-payments are refused.
 **BR-12 Lapsed policies.** A payment received after the grace period has ended is refused: the policy has lapsed and
 needs reinstatement, which is handled outside this service.
 
+**BR-21 Returned payments.** When the bank returns a payment (insufficient funds, a closed account, a chargeback),
+the payment is reversed: that installment is unpaid again, as if it had never been paid, and a **$15.00
+returned-payment fee** is added to its installment fee. Its due date doesn't change, so it may now be past due or
+lapsed. Only that installment changes; the others keep their payments. The fee is charged on every returned payment,
+whatever the reason.
+
 **BR-19 Payment receipts.** Every accepted payment comes with a receipt: the policy, the installment, the day it
 counted, whether it was late, the late fee and the amount. The receipt is signed, so the service can later confirm a
 receipt it issued and refuse one that was altered or that it didn't issue.

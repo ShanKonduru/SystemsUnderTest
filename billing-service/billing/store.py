@@ -154,6 +154,20 @@ class Store:
                 (paid_on.isoformat(), fmt(amount), fmt(late_fee), policy_id, number),
             )
 
+    def return_payment(self, policy_id: str, number: int, returned_fee: Decimal) -> Decimal:
+        """Reverses the payment of installment `number` and adds the returned-payment fee to it (BR-21). Returns the
+        installment's new fee."""
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT fee FROM installments WHERE policy_id = ? AND number = ?", (policy_id, number)
+            ).fetchone()
+            fee = Decimal(row["fee"]) + returned_fee
+            conn.execute(
+                "UPDATE installments SET paid_on = NULL, paid_amount = NULL, late_fee = NULL, fee = ? WHERE policy_id = ?",
+                (fmt(fee), policy_id),
+            )
+        return fee
+
     def cancel(self, policy_id: str, cancel_date: date, refund: Decimal) -> None:
         with self._db() as conn:
             conn.execute(

@@ -10,6 +10,7 @@ reminder_days: 7             # BR-15
 fees:
   late: "10.00"              # BR-11
   cancellation: "25.00"      # RF-04
+  returned_payment: "15.00"  # BR-21
   installment:               # BR-06, per installment
     annual: "0.00"
     semiannual: "0.00"

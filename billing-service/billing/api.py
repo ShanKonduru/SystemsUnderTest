@@ -219,6 +219,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
         return {**result, "receipt": receipts.issue(result, receipt_key)}
 
+    @app.post("/policies/{policy_id}/installments/{number}/return")
+    def return_payment(policy_id: str, number: int) -> dict[str, Any]:
+        """The bank returned the payment of an installment: it is unpaid again, with the returned-payment fee (BR-21)."""
+        p = store.policy(policy_id)
+        if p["cancelled_on"]:
+            raise Conflict(f"policy {policy_id} was cancelled on {p['cancelled_on']}")
+        rows = {r["number"]: r for r in store.installments(policy_id)}
+        if number not in rows:
+            raise NotFound(f"policy {policy_id} has no installment {number}")
+        if rows[number]["paid_on"] is None:
+            raise Conflict(f"installment {number} of policy {policy_id} isn't paid")
+        fee = store.return_payment(policy_id, number, settings.returned_payment_fee)
+        log.info("returned payment policy=%s installment=%s fee=%s", policy_id, number, fmt(fee))
+        return {"policy_id": policy_id, "installment": number, "returned_payment_fee": fmt(settings.returned_payment_fee),
+                "fee": fmt(fee), "amount_due": fmt(Decimal(rows[number]["amount"]) + fee)}
+
     @app.get("/receipts/{token}")
     def receipt(token: str) -> dict[str, Any]:
         """Checks a payment receipt (BR-19) and returns the payment it records."""
