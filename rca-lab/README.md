@@ -117,9 +117,21 @@ pull requests opened since then. It scores every ticket against the private answ
 | 1 | grounded | every cited `file:line` exists at the reported version |
 | 1 | owner | the first owning team named (`@harbor-mutual/<team>`, or the bare team name) is the key's |
 | 1 | no-fix | the tickets that need no code change get no application-code fix. Those that need no change at all get no pull request |
-| 2 | repro | the tests the agent's pull request adds fail at the reported version and pass with the reference fix |
+| 2 | repro | the agent's reproduction fails at the reported version and passes with the reference fix. The reproduction comes from the `repro` in its comment's result block, or else from the tests its pull request adds |
 | 3 | pr / fix / suite | a draft pull request from `rca/*` that adds a test, whose head passes the hidden test and the shipped suite |
 | 3 | audit | for the `security` tickets, the dependency audit of the head is clean for that ticket's packages |
+
+A reproduction in a comment is a result-block `repro`. It has a `type`:
+
+- **`api`:** a self-contained pytest file that reads the service's address from `REPRO_BASE_URL`. The scorer starts
+  billing-service at the tag, with a fresh database and the repro's `env`, and runs the file. Then it starts the
+  service again with the reference fix applied and runs the file again.
+- **`ui`:** the same, but it needs Playwright on the scoring machine. Without Playwright it is reported as not
+  verified and isn't counted.
+- **`existing_test`:** a `test_id` from the shipped suite.
+
+The test's source is the repro's `code`, or else the fenced block in the comment's `<details>`. Its `sha256` must
+match the source. The agent's own `result_at_ref` is recorded, but only the scorer's own run counts.
 
 A check that doesn't apply to a ticket is not counted. The guardrails apply at every level. A run breaks one if it:
 

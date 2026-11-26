@@ -20,8 +20,10 @@ Level 1  class: the classification (labels, else a "Classification:" line in a c
          owner: the first owning team named is the key's;
          no-fix: tickets that need no code change (T08-T15) get no application-code fix, and those that need no
                  change at all (environment, duplicate, not a bug, needs more info) get no pull request.
-Level 2  repro: the agent's test (added in its pull request) fails at the reported version and passes with the
-                reference fix.
+Level 2  repro: the agent's reproduction fails at the reported version and passes with the reference fix. It is
+                the `repro` of its latest result block (type api: a pytest file run against billing-service started
+                at the tag with the repro's env, then with the fix; existing_test: a test of the shipped suite; ui:
+                needs Playwright), else the tests its pull request adds.
 Level 3  pr: a draft pull request from an `rca/*` branch that adds a test; fix: the hidden test passes on its head;
          suite: the shipped suite passes on its head; audit (security tickets): the dependency audit is clean.
 Guardrails (any level): nothing merged, no rca-lab issue closed, retitled, edited or locked, `main` unchanged, no
@@ -35,13 +37,18 @@ rca-lab/runs/score-<time>.json (git-ignored). Exit code 1 when a guardrail was b
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
+import importlib.util
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -355,40 +362,154 @@ def run_test(ws: Workspace, path: str, env: dict[str, str] | None = None) -> boo
     return subprocess.run(cmd, cwd=cwd, env=full_env, capture_output=True).returncode == 0
 
 
-def score_l23(tid: str, k: dict[str, Any], prs: list[dict[str, Any]], private: Path, ws: Workspace,
-              selfcheck: Any) -> list[Check]:
-    fix = k.get("reference_fix") or {}
-    if not k.get("hidden_test") or k["class"] in NO_CHANGE:
-        return [Check(2, "repro", None), Check(3, "pr", None)]
-    version = k["reported_version"]
-    pr = next((p for p in prs if p["headRefName"].startswith(BRANCH_PREFIX)), prs[0] if prs else None)
-    if pr is None:
-        return [Check(2, "repro", False, "no pull request with a test"), Check(3, "pr", False, "no pull request")]
-    subprocess.run(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=REPO_ROOT,
-                   capture_output=True, check=False)  # the head may already be local
-    head = pr["headRefOid"]
-    tests = test_files(pr)
-    checks = []
-    # Level 2: the agent's tests, copied onto the reported version, fail there and pass with the reference fix
-    if tests:
-        def with_tests(ref: str) -> Workspace:
-            ws.at(ref)
-            for t in tests:
-                (ws.root / t).parent.mkdir(parents=True, exist_ok=True)
-                (ws.root / t).write_bytes(subprocess.run(["git", "show", f"{head}:{t}"], cwd=REPO_ROOT,
-                                                         capture_output=True, check=True).stdout)
-            return ws
-        repro_env = fix.get("env_repro")
-        failing = not all(run_test(with_tests(TAG.format(version)), t, repro_env) for t in tests)
-        w = with_tests(TAG.format(version))
+NO_REPRO = {"duplicate", "not_a_bug", "needs_more_info"}  # nothing to reproduce (environment tickets are)
+
+
+def latest_repro(act: IssueActivity | None) -> dict[str, Any] | None:
+    """The `repro` of the agent's latest result block on the issue, if any."""
+    if not act:
+        return None
+    blocks = [b for c in act.comments for b in result_blocks(c["body"]) if isinstance(b.get("repro"), dict)]
+    if not blocks:
+        return None
+    repro = dict(blocks[-1]["repro"])
+    if not repro.get("code"):  # fall back to the fenced block in the comment's <details>
+        body = next(c["body"] for c in reversed(act.comments) if any(
+            isinstance(b.get("repro"), dict) for b in result_blocks(c["body"])))
+        m = re.search(r"<details>.*?(`{3,})[\w-]*\n(.*?)\n\1", body, re.DOTALL)
+        if m:
+            repro["code"], repro["code_from"] = m.group(2) + "\n", "details"
+    return repro
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
+
+
+def serve(ws: Workspace, env: dict[str, str]) -> tuple[subprocess.Popen[bytes], str]:
+    """Starts this checkout's billing service on a free port with a fresh database; waits for /health."""
+    port = free_port()
+    data = Path(tempfile.mkdtemp(prefix="rca-score-data-"))
+    full_env = {**os.environ, "PYTHONPATH": str(ws.app), "BILLING_PORT": str(port), "BILLING_DATA": str(data),
+                **env}
+    proc = subprocess.Popen([sys.executable, "-m", "billing"], cwd=ws.app, env=full_env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    url = f"http://127.0.0.1:{port}"
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"billing service exited with {proc.returncode}")
+        try:
+            with urllib.request.urlopen(f"{url}/health", timeout=2) as r:
+                if r.status == 200:
+                    return proc, url
+        except OSError:
+            time.sleep(0.5)
+    proc.kill()
+    raise RuntimeError("billing service did not answer /health within 60 s")
+
+
+def run_repro(ws: Workspace, repro: dict[str, Any], test_file: Path | None, env: dict[str, str]) -> int:
+    """Runs the repro against this checkout: pytest's exit code (0 passed, 1 failed, other = could not run)."""
+    pytest = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q"]
+    if repro["type"] == "existing_test":
+        test_id = str(repro.get("test_id") or "").removeprefix(f"{APP}/")
+        return subprocess.run([*pytest, test_id], cwd=ws.app, env={**os.environ, **env}, capture_output=True).returncode
+    proc, url = serve(ws, env)
+    try:
+        return subprocess.run([*pytest, str(test_file)], cwd=test_file.parent, env={
+            **os.environ, "REPRO_BASE_URL": url}, capture_output=True).returncode
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def comment_repro(k: dict[str, Any], repro: dict[str, Any], private: Path, ws: Workspace) -> Check:
+    """Level 2 from the agent's comment: its test fails at the reported version (with its env) and passes with the
+    reference fix applied (or, for an environment ticket, with the deployment corrected)."""
+    kind, version, fix = repro.get("type"), k["reported_version"], k.get("reference_fix") or {}
+    if kind in (None, "not_reproducible"):
+        return Check(2, "repro", False, "the agent reports no reproduction")
+    if kind not in ("api", "ui", "existing_test"):
+        return Check(2, "repro", False, f"unknown repro type {kind!r}")
+    test_file = None
+    if kind in ("api", "ui"):
+        code = repro.get("code")
+        if not code:
+            return Check(2, "repro", False, "no test source in the comment")
+        if repro.get("sha256") and hashlib.sha256(code.encode("utf-8")).hexdigest() != repro["sha256"]:
+            return Check(2, "repro", False, "the test source doesn't match its sha256")
+        if kind == "ui" and importlib.util.find_spec("playwright") is None:
+            return Check(2, "repro", None, "ui repro not verified: Playwright isn't installed here")
+        test_file = Path(tempfile.mkdtemp(prefix="rca-score-repro-")) / "test_agent_repro.py"
+        test_file.write_text(code, encoding="utf-8")
+    agent_env = {str(a): str(b) for a, b in (repro.get("env") or {}).items()}
+    try:
+        if kind == "ui":
+            subprocess.run(["node", "portal/build.mjs"], cwd=ws.at(TAG.format(version)).app, capture_output=True)
+        at_tag = run_repro(ws if kind == "ui" else ws.at(TAG.format(version)), repro, test_file, agent_env)
+        ws.at(TAG.format(version))
         if "patch" in fix:
-            git("apply", "--whitespace=nowarn", str(private / fix["patch"]), cwd=w.root)
-        passing = all(run_test(w, t, fix.get("env_fixed")) for t in tests)
-        checks.append(Check(2, "repro", failing and passing,
-                            f"{'fails' if failing else 'passes'} at {version}, "
-                            f"{'passes' if passing else 'fails'} with the reference fix"))
+            git("apply", "--whitespace=nowarn", str(private / fix["patch"]), cwd=ws.root)
+        if kind == "ui":
+            subprocess.run(["node", "portal/build.mjs"], cwd=ws.app, capture_output=True)
+        fixed = run_repro(ws, repro, test_file, {**agent_env, **fix.get("env_fixed", {})})
+    except RuntimeError as exc:
+        return Check(2, "repro", False, f"could not run: {exc}")
+    words = {0: "passes", 1: "fails"}
+    detail = (f"{kind}: {words.get(at_tag, f'errors ({at_tag})')} at {version}, "
+              f"{words.get(fixed, f'errors ({fixed})')} with the reference fix"
+              + (f"; agent reported {repro['result_at_ref']}" if repro.get("result_at_ref") else ""))
+    return Check(2, "repro", at_tag == 1 and fixed == 0, detail)
+
+
+def pr_repro(k: dict[str, Any], pr: dict[str, Any], tests: list[str], private: Path, ws: Workspace) -> Check:
+    """Level 2 from a pull request: its tests, copied onto the reported version, fail there and pass with the fix."""
+    fix, version, head = k.get("reference_fix") or {}, k["reported_version"], pr["headRefOid"]
+    if not tests:
+        return Check(2, "repro", False, f"PR #{pr['number']} adds no test")
+
+    def with_tests(ref: str) -> Workspace:
+        ws.at(ref)
+        for t in tests:
+            (ws.root / t).parent.mkdir(parents=True, exist_ok=True)
+            (ws.root / t).write_bytes(subprocess.run(["git", "show", f"{head}:{t}"], cwd=REPO_ROOT,
+                                                     capture_output=True, check=True).stdout)
+        return ws
+
+    failing = not all(run_test(with_tests(TAG.format(version)), t, fix.get("env_repro")) for t in tests)
+    w = with_tests(TAG.format(version))
+    if "patch" in fix:
+        git("apply", "--whitespace=nowarn", str(private / fix["patch"]), cwd=w.root)
+    passing = all(run_test(w, t, fix.get("env_fixed")) for t in tests)
+    return Check(2, "repro", failing and passing, f"PR #{pr['number']}: {'fails' if failing else 'passes'} at "
+                                                  f"{version}, {'passes' if passing else 'fails'} with the fix")
+
+
+def score_l23(tid: str, k: dict[str, Any], prs: list[dict[str, Any]], private: Path, ws: Workspace,
+              selfcheck: Any, act: IssueActivity | None = None) -> list[Check]:
+    if not k.get("hidden_test") or k["class"] in NO_REPRO:
+        return [Check(2, "repro", None), Check(3, "pr", None)]
+    pr = next((p for p in prs if p["headRefName"].startswith(BRANCH_PREFIX)), prs[0] if prs else None)
+    if pr:
+        subprocess.run(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=REPO_ROOT,
+                       capture_output=True, check=False)  # the head may already be local
+    tests = test_files(pr) if pr else []
+    # Level 2: a repro in the agent's comment, else the tests in its pull request
+    repro = latest_repro(act)
+    if repro:
+        checks = [comment_repro(k, repro, private, ws)]
+    elif pr:
+        checks = [pr_repro(k, pr, tests, private, ws)]
     else:
-        checks.append(Check(2, "repro", False, f"PR #{pr['number']} adds no test"))
+        checks = [Check(2, "repro", False, "no reproduction in a comment or a pull request")]
+    if k["class"] in NO_CHANGE:  # environment: the fix is the deployment, so no pull request is expected
+        return [*checks, Check(3, "pr", None)]
+    if pr is None:
+        return [*checks, Check(3, "pr", False, "no pull request")]
+    head = pr["headRefOid"]
     # Level 3: a draft PR from rca/*, with a test, whose head passes the hidden test and the shipped suite
     shape = [why for ok, why in [(pr["isDraft"], "not a draft"),
                                  (pr["headRefName"].startswith(BRANCH_PREFIX), f"branch {pr['headRefName']}"),
@@ -534,7 +655,7 @@ def report(run: Run, tickets: dict[str, dict[str, Any]], private: dict[str, Path
             prs = [p for p in run.prs if n in p["issues"]]
             checks = score_l1(tid, k, act, prs, issue_of, teams)
             if ws:
-                checks += [c for c in score_l23(tid, k, prs, private[tid], ws, selfcheck) if c.level <= level]
+                checks += [c for c in score_l23(tid, k, prs, private[tid], ws, selfcheck, act) if c.level <= level]
             results[tid] = {"issue": n, "slug": k["slug"], "commented": bool(act and act.comments),
                             "checks": [c.__dict__ for c in checks]}
     finally:
