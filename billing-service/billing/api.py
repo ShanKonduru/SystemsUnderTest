@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from . import __version__, letters, receipts
 from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
+from .endorsements import endorsement_quote
 from .errors import BillingError, Conflict, NotFound
 from .money import fmt
 from .notify import Gateway
@@ -257,6 +258,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             notice_days=settings.renewal_notice_days,
         )
         return HTMLResponse(html)
+
+    @app.get("/policies/{policy_id}/endorsement-quote")
+    def endorsement(policy_id: str, coverage: str, on: date | None = None) -> dict[str, Any]:
+        """What a coverage change from `on` (default today) costs for the rest of the term (BR-20)."""
+        p = store.policy(policy_id)
+        if p["cancelled_on"]:
+            raise Conflict(f"policy {policy_id} was cancelled on {p['cancelled_on']}")
+        c = store.customer(p["customer_id"])
+        e = endorsement_quote(rates, p, coverage=coverage, on=on or settings.today,
+                              policy_count=store.active_policy_count(c["id"]), paperless=c["paperless"])
+        return {
+            "policy_id": policy_id, "on": (on or settings.today).isoformat(), "coverage_from": e.coverage_from,
+            "coverage_to": e.coverage_to, "old_premium": fmt(e.old_premium), "new_premium": fmt(e.new_premium),
+            "days_remaining": e.days_remaining, "term_days": e.term_days, "adjustment": fmt(e.adjustment),
+        }
 
     @app.get("/policies/{policy_id}/refund-quote")
     def refund_preview(policy_id: str, cancel_date: date) -> dict[str, Any]:

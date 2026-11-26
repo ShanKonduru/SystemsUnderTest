@@ -91,6 +91,19 @@ which emails paperless customers and mails everyone else. A reminder gives the p
 and the amount due (premium plus installment fee). A delivery the gateway refuses is reported, and the others still
 go out.
 
+## Coverage changes
+
+**BR-20 Endorsements.** A member can change a policy's coverage during its term, from any day between the effective
+date and the day before the renewal date. The new annual premium is quoted the way a new policy would be quoted on
+that day (BR-01 to BR-04): the same state, product and driver, with the customer's current number of active policies
+and paperless setting. The adjustment is the difference for the rest of the term:
+
+    adjustment = (new annual premium - old annual premium) x days remaining / days in the term
+
+Days remaining count from the endorsement date to the day before renewal, both included; days in the term as in
+BR-09. The adjustment is rounded half-up to cents. A positive adjustment is charged, a negative one refunded. A
+cancelled policy can't be changed.
+
 ## Renewals
 
 **BR-09 Term.** A policy runs 12 months: it renews on the same day of the month as its effective date, a year later
