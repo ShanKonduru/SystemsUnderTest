@@ -33,6 +33,7 @@ class Settings:
     rates_path: Path
     sandbox_token: str = ""
     notify_url: str = ""
+    receipt_key: str = ""
 
     @property
     def db_path(self) -> Path:
@@ -63,4 +64,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         rates_path=Path(env.get("BILLING_RATES") or DEFAULT_RATES),
         sandbox_token=env.get("BILLING_SANDBOX_TOKEN", ""),
         notify_url=env.get("BILLING_NOTIFY_URL", ""),
+        receipt_key=env.get("BILLING_RECEIPT_KEY", ""),
     )

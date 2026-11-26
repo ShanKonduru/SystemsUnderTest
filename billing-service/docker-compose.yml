@@ -22,6 +22,8 @@ services:
       BILLING_TIMEZONE: ${BILLING_TIMEZONE:-}
       # The notification gateway POST /reminders/send posts to; empty turns reminder delivery off.
       BILLING_NOTIFY_URL: ${BILLING_NOTIFY_URL:-}
+      # Signs payment receipts; empty uses a random key until the container restarts.
+      BILLING_RECEIPT_KEY: ${BILLING_RECEIPT_KEY:-}
       # Test-control endpoints (/sandbox/status, /sandbox/reset) need this token; empty refuses both.
       BILLING_SANDBOX_TOKEN: ${BILLING_SANDBOX_TOKEN:-}
     ports:

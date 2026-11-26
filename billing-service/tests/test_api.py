@@ -93,7 +93,7 @@ def test_payment_on_the_due_date_in_eastern_time(client: TestClient, settings: S
     r = client.post("/policies/P-5005/payments", json={"amount": "960.04", "received_at": "2026-11-01T22:00:00-05:00"})
     assert r.status_code == 200
     assert r.json() == {"policy_id": "P-5005", "installment": 2, "received_on": "2026-11-01", "late": False,
-                        "late_fee": "0.00", "amount": "960.04"}
+                        "late_fee": "0.00", "amount": "960.04", "receipt": r.json()["receipt"]}
     assert client.get("/policies/P-5005").json()["status"] == "active"
     log = settings.log_path.read_text(encoding="utf-8")
     assert "payment policy=P-5005 installment=2 received_at=2026-11-01T22:00:00-05:00 received_on=2026-11-01" in log

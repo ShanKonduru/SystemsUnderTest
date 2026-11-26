@@ -77,6 +77,10 @@ a **$10.00 late fee**. Partial and over-payments are refused.
 **BR-12 Lapsed policies.** A payment received after the grace period has ended is refused: the policy has lapsed and
 needs reinstatement, which is handled outside this service.
 
+**BR-19 Payment receipts.** Every accepted payment comes with a receipt: the policy, the installment, the day it
+counted, whether it was late, the late fee and the amount. The receipt is signed, so the service can later confirm a
+receipt it issued and refuse one that was altered or that it didn't issue.
+
 **BR-15 Payment reminders.** A reminder is sent **7 days** before each unpaid installment's due date: an
 installment due November 30 is reminded on November 23, one due March 3 on February 24, one due January 1 on
 December 25 of the year before. Paid installments and cancelled policies get no reminders.

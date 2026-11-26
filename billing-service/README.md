@@ -19,7 +19,7 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 |---|---|
 | `billing/premiums.py` | Quotes: base rate x coverage x driver age, multi-policy and paperless discounts, half-up rounding |
 | `billing/installments.py`, `billing/dates.py` | Installment plans, amounts and due dates |
-| `billing/payments.py` | The billing day (Eastern time), exact amounts, late fees |
+| `billing/payments.py`, `billing/receipts.py` | The billing day (Eastern time), exact amounts, late fees; signed payment receipts |
 | `billing/reminders.py`, `billing/notify.py` | Payment reminder dates; delivery through the notification gateway |
 | `billing/renewals.py` | Standing (active / past due / lapsed), renewal dates, renewal notice dates |
 | `billing/letters.py`, `billing/templates/` | Letters to members (the renewal notice), rendered from HTML templates |
@@ -53,6 +53,7 @@ node portal\build.mjs                 :: builds portal\dist for the /portal page
 | `BILLING_TIMEZONE` | from `config/billing.yaml` | Overrides the billing timezone |
 | `BILLING_CONFIG`, `BILLING_RATES` | `config/billing.yaml`, `reference/rate_tables.csv` | Alternative config or rate table |
 | `BILLING_NOTIFY_URL` | empty | The notification gateway that `POST /reminders/send` posts to; empty answers 409 |
+| `BILLING_RECEIPT_KEY` | empty | Key that signs payment receipts; empty uses a random key, so receipts stop checking out after a restart |
 | `BILLING_SANDBOX_TOKEN` | empty | Token for `/sandbox/status` and `/sandbox/reset` (header `X-Sandbox-Token`); empty refuses both |
 
 ### Running a particular version
@@ -109,7 +110,8 @@ git worktree remove --force ..\billing-1.1.0
 | `GET /policies/{id}` | Policy, renewal date, status, standing (installment, due date, grace end, lapse date) and `next_payment`: what a payment made today must be, late fee included |
 | `GET /policies/{id}/schedule` | Installments: due date, amount, fee, total, paid on, late fee |
 | `POST /reminders/send?on=` | Delivers the reminders due on that day (default today) through the notification gateway (BR-18): `{on, sent, failed}` |
-| `POST /policies/{id}/payments` | `{amount, received_at}` (ISO 8601 with offset) → pays the earliest unpaid installment |
+| `POST /policies/{id}/payments` | `{amount, received_at}` (ISO 8601 with offset) → pays the earliest unpaid installment; the answer carries a signed `receipt` (BR-19) |
+| `GET /receipts/{receipt}` | Checks a receipt and returns the payment it records; 422 for one the service didn't issue |
 | `GET /policies/{id}/reminders` | Payment reminders for the unpaid installments: remind on, sent or scheduled |
 | `GET /policies/{id}/renewal` | Renewal date, notice date, eligibility, renewal premium |
 | `GET /policies/{id}/renewal-notice` | The renewal notice letter as an HTML page (BR-17); 409 when the policy isn't offered a renewal |

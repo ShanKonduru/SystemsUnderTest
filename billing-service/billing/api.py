@@ -4,6 +4,7 @@ answered with a 500 that carries the same id, so a support ticket can quote it."
 from __future__ import annotations
 
 import logging
+import secrets
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -15,7 +16,7 @@ from fastapi import FastAPI, Header, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
-from . import __version__, letters
+from . import __version__, letters, receipts
 from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .errors import BillingError, Conflict, NotFound
@@ -74,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Harbor Mutual billing service", version=__version__)
     app.state.settings, app.state.rates, app.state.store = settings, rates, store
     app.state.gateway = Gateway(settings.notify_url) if settings.notify_url else None
+    receipt_key = settings.receipt_key or secrets.token_hex(32)
 
     @app.middleware("http")
     async def request_log(request: Request, call_next: Any) -> Response:
@@ -207,10 +209,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log.info("payment policy=%s installment=%s received_at=%s received_on=%s late=%s amount=%s",
                  policy_id, outcome.installment, body.received_at.isoformat(), received_on, outcome.late,
                  fmt(outcome.amount_due))
-        return {
+        result = {
             "policy_id": policy_id, "installment": outcome.installment, "received_on": received_on.isoformat(),
             "late": outcome.late, "late_fee": fmt(outcome.late_fee), "amount": fmt(outcome.amount_due),
         }
+        return {**result, "receipt": receipts.issue(result, receipt_key)}
+
+    @app.get("/receipts/{token}")
+    def receipt(token: str) -> dict[str, Any]:
+        """Checks a payment receipt (BR-19) and returns the payment it records."""
+        return {"valid": True, **receipts.verify(token, receipt_key)}
 
     @app.get("/policies/{policy_id}/renewal")
     def renewal(policy_id: str) -> dict[str, Any]:
