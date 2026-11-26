@@ -24,6 +24,7 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 | `billing/renewals.py` | Standing (active / past due / lapsed), renewal dates, renewal notice dates |
 | `billing/refunds.py` | Free-look and pro-rata refunds |
 | `billing/rates.py`, `reference/rate_tables.csv` | The rate table |
+| `billing/taxes.py` | State premium tax on quotes |
 | `billing/store.py` | SQLite schema and seed data |
 | `billing/api.py` | HTTP endpoints, request ids, error logging |
 | `billing/_vendor/holidaycal/` | US federal holiday calendar (third-party, pinned) |

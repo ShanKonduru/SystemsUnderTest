@@ -29,6 +29,14 @@ So a paperless customer with three policies gets 12%.
 and discounts are applied to the unrounded amount. Example: NJ auto, plus coverage, 67-year-old driver, three policies,
 paperless: 1517.85 x 1.25 x 1.15 x 0.88 = 1920.08025, premium **1920.08**.
 
+**BR-16 Premium tax.** Quotes show the state premium tax on top of the premium, and the total the member pays.
+The tax is the premium times the state's rate, rounded half-up to cents; it is collected for the state and is not part
+of the premium (discounts, installments and refunds work on the premium alone).
+
+| State | CT | MA | NJ | NY | PA |
+|---|---|---|---|---|---|
+| Premium tax rate | 1.75% | 2.28% | 2.10% | 2.00% | 2.00% |
+
 ## Installments
 
 **BR-05 Plans.** The annual premium is paid in 1 (annual), 2 (semiannual), 4 (quarterly) or 12 (monthly)

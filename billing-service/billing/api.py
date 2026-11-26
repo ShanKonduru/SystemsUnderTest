@@ -25,6 +25,7 @@ from .refunds import RefundQuote, refund_quote
 from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
 from .store import Store
+from .taxes import premium_tax
 
 log = logging.getLogger("billing")
 PORTAL_DIST = SERVICE_ROOT / "portal" / "dist"
@@ -93,10 +94,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/quotes")
     def quote(body: QuoteRequest) -> dict[str, Any]:
         q = quote_premium(rates, **body.model_dump())
+        tax = premium_tax(body.state, q.premium)
         return {
             "base_rate": fmt(q.base_rate), "coverage_factor": str(q.coverage_factor), "age_factor": str(q.age_factor),
             "subtotal": fmt(q.subtotal), "discount_rate": str(q.discount_rate), "discount": fmt(q.discount),
-            "premium": fmt(q.premium), "currency": settings.currency,
+            "premium": fmt(q.premium), "premium_tax": fmt(tax), "total": fmt(q.premium + tax),
+            "currency": settings.currency,
         }
 
     @app.get("/customers/{customer_id}")
