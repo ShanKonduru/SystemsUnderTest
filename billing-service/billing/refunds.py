@@ -1,8 +1,10 @@
 """Refunds on cancellation (RF-01 to RF-05 in docs/specs/refund-rules.md)."""
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from .errors import BillingError
 from .money import to_money
@@ -18,6 +20,11 @@ class RefundQuote:
     refund: Decimal
     days_in_force: int
     term_days: int
+
+
+def premium_paid(installments: Iterable[Mapping[str, Any]]) -> Decimal:
+    """The premium the member has paid so far, from the payments recorded against each installment."""
+    return sum((Decimal(row["paid_amount"]) for row in installments if row["paid_on"] is not None), Decimal("0.00"))
 
 
 def refund_quote(

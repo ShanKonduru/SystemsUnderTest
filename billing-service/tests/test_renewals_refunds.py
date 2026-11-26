@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from billing.errors import BillingError
-from billing.refunds import RefundQuote, refund_quote
+from billing.refunds import RefundQuote, premium_paid, refund_quote
 from billing.renewals import Standing, notice_date, renewal_date, standing, term_days
 
 TODAY = date(2026, 11, 3)
@@ -86,3 +86,12 @@ def test_cancel_date_must_be_in_the_term() -> None:
         quote(date(2026, 6, 14))
     with pytest.raises(BillingError, match="within the term"):
         quote(date(2027, 6, 15))
+
+
+def test_premium_paid_counts_paid_installments_only() -> None:
+    rows = [
+        {"number": 1, "amount": "960.04", "paid_on": "2026-05-01", "paid_amount": "960.04"},
+        {"number": 2, "amount": "960.04", "paid_on": None, "paid_amount": None},
+    ]
+    assert premium_paid(rows) == Decimal("960.04")
+    assert premium_paid([]) == Decimal("0.00")

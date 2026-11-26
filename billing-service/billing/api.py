@@ -21,7 +21,7 @@ from .money import fmt
 from .payments import assess_payment, received_date
 from .premiums import quote_premium
 from .rates import load_rates
-from .refunds import RefundQuote, refund_quote
+from .refunds import RefundQuote, premium_paid, refund_quote
 from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
 from .store import Store
@@ -249,9 +249,7 @@ def _standing(store: Store, settings: Settings, p: dict[str, Any]) -> Standing:
 
 
 def _refund(store: Store, settings: Settings, p: dict[str, Any], cancel_date: date) -> RefundQuote:
-    paid = sum(
-        (Decimal(r["amount"]) for r in store.installments(p["id"]) if r["paid_on"] is not None), Decimal("0.00")
-    )
+    paid = premium_paid(store.installments(p["id"]))
     return refund_quote(
         annual_premium=Decimal(p["annual_premium"]),
         effective=date.fromisoformat(p["effective_date"]),
