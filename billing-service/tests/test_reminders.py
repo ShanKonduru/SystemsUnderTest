@@ -40,3 +40,18 @@ def test_no_reminders_when_paid_up_or_cancelled(client: TestClient) -> None:
     client.post("/policies/P-5001/cancel", json={"cancel_date": "2026-11-03"})
     assert client.get("/policies/P-5001/reminders").json()["reminders"] == []
     assert client.get("/policies/P-9999/reminders").status_code == 404
+
+
+# The schedule P-5001 was seeded with, shared by the checks below.
+SCHEDULE: dict[str, list[dict]] = {}
+
+
+def test_schedule_for_reminders(client: TestClient) -> None:
+    SCHEDULE["P-5001"] = client.get("/policies/P-5001/schedule").json()["installments"]
+    assert len(SCHEDULE["P-5001"]) == 12
+
+
+def test_every_unpaid_installment_gets_a_reminder(client: TestClient) -> None:
+    unpaid = [i["number"] for i in SCHEDULE["P-5001"] if i["paid_on"] is None]
+    reminders = client.get("/policies/P-5001/reminders").json()["reminders"]
+    assert [r["installment"] for r in reminders] == unpaid
