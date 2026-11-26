@@ -5,7 +5,7 @@ import pytest
 
 from billing.errors import BillingError, Conflict
 from billing.installments import Installment, build_schedule
-from billing.payments import assess_payment, received_date
+from billing.payments import assess_payment, late_fee_on, received_date
 
 FEES = {"annual": Decimal("0.00"), "semiannual": Decimal("0.00"), "quarterly": Decimal("2.00"),
         "monthly": Decimal("3.00")}
@@ -78,3 +78,8 @@ def test_wrong_amount_and_lapsed() -> None:
         assess_payment(INST, Decimal("900"), date(2026, 10, 30), 10, Decimal("10.00"))
     with pytest.raises(Conflict, match="lapsed after 2026-11-11"):
         assess_payment(INST, Decimal("970.04"), date(2026, 11, 12), 10, Decimal("10.00"))
+
+
+def test_late_fee_on() -> None:
+    assert late_fee_on(INST, date(2026, 10, 30), Decimal("10.00")) == Decimal("0.00")
+    assert late_fee_on(INST, date(2026, 11, 2), Decimal("10.00")) == Decimal("10.00")

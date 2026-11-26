@@ -19,7 +19,7 @@ from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .errors import BillingError, Conflict, NotFound
 from .money import fmt
-from .payments import assess_payment, received_date
+from .payments import assess_payment, late_fee_on, received_date
 from .premiums import quote_premium
 from .rates import load_rates
 from .refunds import RefundQuote, premium_paid, refund_quote
@@ -117,9 +117,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         unpaid = [r for r in store.installments(policy_id) if r["paid_on"] is None]
         next_payment = None
         if unpaid and s.status in ("active", "past_due"):
-            # what a payment made today must be (BR-11): the next installment, plus the late fee once it's overdue
+            # what a payment made today must be (BR-11)
             inst = store.as_installment(unpaid[0])
-            late_fee = settings.late_fee if settings.today > inst.due_date else Decimal("0.00")
+            late_fee = late_fee_on(inst, settings.today, settings.late_fee)
             next_payment = {"installment": inst.number, "due_date": inst.due_date.isoformat(),
                             "late_fee": fmt(late_fee), "amount_due": fmt(inst.total + late_fee)}
         return {

@@ -25,6 +25,11 @@ def received_date(received_at: datetime, timezone: str) -> date:
     return received_at.astimezone(ZoneInfo(timezone)).date()
 
 
+def late_fee_on(installment: Installment, day: date, late_fee: Decimal) -> Decimal:
+    """The late fee a payment of `installment` made on `day` must include (BR-11)."""
+    return late_fee if day >= installment.due_date else Decimal("0.00")
+
+
 def assess_payment(
     installment: Installment, amount: Decimal, received_on: date, grace_days: int, late_fee: Decimal
 ) -> PaymentOutcome:
