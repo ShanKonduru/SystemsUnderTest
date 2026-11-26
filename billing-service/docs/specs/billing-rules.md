@@ -81,6 +81,11 @@ needs reinstatement, which is handled outside this service.
 installment due November 30 is reminded on November 23, one due March 3 on February 24, one due January 1 on
 December 25 of the year before. Paid installments and cancelled policies get no reminders.
 
+**BR-18 Reminder delivery.** Each day the reminders due that day (BR-15) are handed to the notification gateway,
+which emails paperless customers and mails everyone else. A reminder gives the policy, the installment, its due date
+and the amount due (premium plus installment fee). A delivery the gateway refuses is reported, and the others still
+go out.
+
 ## Renewals
 
 **BR-09 Term.** A policy runs 12 months: it renews on the same day of the month as its effective date, a year later

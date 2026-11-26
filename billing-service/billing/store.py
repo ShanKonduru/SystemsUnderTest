@@ -125,6 +125,10 @@ class Store:
             raise NotFound(f"no policy {policy_id}")
         return dict(row)
 
+    def policy_ids(self) -> list[str]:
+        with self._db() as conn:
+            return [row["id"] for row in conn.execute("SELECT id FROM policies ORDER BY id").fetchall()]
+
     def active_policy_count(self, customer_id: str) -> int:
         with self._db() as conn:
             return conn.execute(

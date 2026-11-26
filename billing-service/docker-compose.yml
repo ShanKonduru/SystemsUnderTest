@@ -20,6 +20,8 @@ services:
       BILLING_TODAY: ${BILLING_TODAY:-2026-11-03}
       # Overrides the billing timezone in config/billing.yaml; empty keeps the config's.
       BILLING_TIMEZONE: ${BILLING_TIMEZONE:-}
+      # The notification gateway POST /reminders/send posts to; empty turns reminder delivery off.
+      BILLING_NOTIFY_URL: ${BILLING_NOTIFY_URL:-}
       # Test-control endpoints (/sandbox/status, /sandbox/reset) need this token; empty refuses both.
       BILLING_SANDBOX_TOKEN: ${BILLING_SANDBOX_TOKEN:-}
     ports:

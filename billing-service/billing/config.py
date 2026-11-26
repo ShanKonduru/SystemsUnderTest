@@ -32,6 +32,7 @@ class Settings:
     data_dir: Path
     rates_path: Path
     sandbox_token: str = ""
+    notify_url: str = ""
 
     @property
     def db_path(self) -> Path:
@@ -43,7 +44,7 @@ class Settings:
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
-    """Business rules come from the YAML file; paths, the clock, the timezone and the token from the environment."""
+    """Business rules come from the YAML file; paths, the clock, the timezone, the token and the gateway from the environment."""
     env = os.environ if env is None else env
     raw = yaml.safe_load(Path(env.get("BILLING_CONFIG") or DEFAULT_CONFIG).read_text(encoding="utf-8"))
     fees = raw["fees"]
@@ -61,4 +62,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         data_dir=Path(env.get("BILLING_DATA") or SERVICE_ROOT / "data"),
         rates_path=Path(env.get("BILLING_RATES") or DEFAULT_RATES),
         sandbox_token=env.get("BILLING_SANDBOX_TOKEN", ""),
+        notify_url=env.get("BILLING_NOTIFY_URL", ""),
     )

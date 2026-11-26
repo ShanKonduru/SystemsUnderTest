@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import requests
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
@@ -19,6 +20,7 @@ from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .errors import BillingError, Conflict, NotFound
 from .money import fmt
+from .notify import Gateway
 from .payments import assess_payment, late_fee_on, received_date
 from .premiums import quote_premium
 from .rates import load_rates
@@ -71,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Harbor Mutual billing service", version=__version__)
     app.state.settings, app.state.rates, app.state.store = settings, rates, store
+    app.state.gateway = Gateway(settings.notify_url) if settings.notify_url else None
 
     @app.middleware("http")
     async def request_log(request: Request, call_next: Any) -> Response:
@@ -157,6 +160,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "status": "sent" if remind_on <= settings.today else "scheduled",
                 })
         return {"policy_id": policy_id, "reminders": result}
+
+    @app.post("/reminders/send")
+    def send_reminders(on: date | None = None) -> dict[str, Any]:
+        """Delivers the reminders due on `on` (default today) through the notification gateway (BR-18)."""
+        gateway: Gateway | None = app.state.gateway
+        if gateway is None:
+            raise Conflict("reminder delivery is not configured: set BILLING_NOTIFY_URL")
+        day = (on or settings.today).isoformat()
+        sent, failed = [], []
+        for policy_id in store.policy_ids():
+            for r in reminders(policy_id)["reminders"]:
+                if r["remind_on"] != day:
+                    continue
+                p = store.policy(policy_id)
+                c = store.customer(p["customer_id"])
+                row = store.installments(policy_id)[r["installment"] - 1]
+                message = {
+                    "kind": "payment_reminder", "channel": "email" if c["paperless"] else "mail",
+                    "customer_id": c["id"], "name": c["name"], "policy_id": policy_id,
+                    "installment": r["installment"], "due_date": r["due_date"],
+                    "amount_due": fmt(Decimal(row["amount"]) + Decimal(row["fee"])),
+                }
+                entry = {"policy_id": policy_id, "installment": r["installment"]}
+                try:
+                    sent.append({**entry, "message_id": gateway.send(message)})
+                except requests.RequestException as exc:
+                    log.warning("reminder not delivered policy=%s installment=%s: %s", policy_id, r["installment"],
+                                exc)
+                    failed.append({**entry, "error": type(exc).__name__})
+        log.info("reminders on=%s sent=%s failed=%s", day, len(sent), len(failed))
+        return {"on": day, "sent": sent, "failed": failed}
 
     @app.post("/policies/{policy_id}/payments")
     def pay(policy_id: str, body: PaymentRequest) -> dict[str, Any]:
