@@ -1,7 +1,7 @@
 // Date display (PD-02, PD-03 in docs/specs/portal-display.md). Dates are ISO calendar dates ("2026-11-03") with no
 // time or zone, so all arithmetic is done in UTC to keep the member's own timezone out of it.
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DISPLAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 export interface CalendarDate {
   year: number;
@@ -20,8 +20,8 @@ export function parseIsoDate(iso: string): CalendarDate {
 
 /** "2027-03-01" -> "Mar 1, 2027". */
 export function formatDate(iso: string): string {
-  const { year, month, day } = parseIsoDate(iso);
-  return `${MONTHS[month - 1]} ${day}, ${year}`;
+  parseIsoDate(iso);
+  return DISPLAY.format(new Date(iso));
 }
 
 /** Whole days from `fromIso` to `toIso` (negative when `toIso` is earlier). */
