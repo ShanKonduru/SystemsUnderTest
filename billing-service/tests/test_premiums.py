@@ -51,7 +51,7 @@ def test_age_only_matters_for_auto() -> None:
         age_factor("auto", 15)
 
 
-@pytest.mark.parametrize(("count", "rate"), [(1, "0.00"), (2, "0.05"), (3, "0.10"), (5, "0.10")])
+@pytest.mark.parametrize(("count", "rate"), [(1, "0.00"), (2, "0.05"), (3, "0.10"), (4, "0.12")])
 def test_multi_policy_discount(count: int, rate: str) -> None:
     assert multi_policy_discount(count) == Decimal(rate)
 

@@ -20,10 +20,11 @@ other state or product is refused (`unknown_territory`), never priced from a def
 | Discount | Rate |
 |---|---|
 | Multi-policy: the customer holds 2 active policies (including this one) | 5% |
-| Multi-policy: the customer holds 3 or more active policies | 10% |
+| Multi-policy: the customer holds 3 active policies | 10% |
+| Multi-policy (loyalty tier): the customer holds 4 or more active policies | 12% |
 | Paperless billing | 2% |
 
-So a paperless customer with three policies gets 12%.
+So a paperless customer with three policies gets 12%, and one with six policies 14%.
 
 **BR-04 Rounding.** Only the final annual premium is rounded, to whole cents, **half-up** (0.005 rounds up). Factors
 and discounts are applied to the unrounded amount. Example: NJ auto, plus coverage, 67-year-old driver, three policies,

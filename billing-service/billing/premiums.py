@@ -9,6 +9,7 @@ from .rates import PRODUCTS, RateTable
 
 COVERAGE_FACTORS = {"basic": Decimal("0.85"), "standard": Decimal("1.00"), "plus": Decimal("1.25")}
 PAPERLESS_DISCOUNT = Decimal("0.02")
+MULTI_POLICY_TIERS = {2: Decimal("0.05"), 3: Decimal("0.10"), 4: Decimal("0.12")}
 
 
 @dataclass(frozen=True)
@@ -40,14 +41,10 @@ def age_factor(product: str, driver_age: int | None) -> Decimal:
 
 
 def multi_policy_discount(policy_count: int) -> Decimal:
-    """BR-03: 5% with two active policies, 10% with three or more."""
+    """BR-03: the discount for the customer's number of active policies."""
     if policy_count < 1:
         raise BillingError("policy_count must be at least 1")
-    if policy_count >= 3:
-        return Decimal("0.10")
-    elif policy_count == 2:
-        return Decimal("0.05")
-    return Decimal("0.00")
+    return MULTI_POLICY_TIERS.get(policy_count, Decimal("0.00"))
 
 
 def quote_premium(
