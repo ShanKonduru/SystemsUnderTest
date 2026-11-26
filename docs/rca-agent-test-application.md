@@ -1,6 +1,6 @@
 # Test application for the RCA agent
 
-Status: design; step 1 in progress.
+Status: steps 1 and 2 built (billing-service v1.0.0 to v1.2.0); steps 3 to 5 to do.
 
 ## Purpose
 
@@ -51,13 +51,14 @@ billing-service/              the application under test (what the RCA agent inv
   docs/specs/                 the knowledge base the agent may cite (billing rules, refund rules, portal display rules)
   tests/                      the shipped pytest suite: green on main, the planted bugs escape it
   CODEOWNERS                  owning teams in standard CODEOWNERS syntax (kept here, not in .github/, because
-                              GitHub would reject the fictitious @harbor-mutual/* teams)
+                              GitHub would reject the fictitious @harbor-mutual/* teams; GitHub doesn't enforce it, so
+                              draft PRs get no automatic reviewers and the scorer doesn't expect any)
 
 rca-lab/                      the harness (what the evaluator uses)
   tickets/*.md                one file per ticket: title, body, inline logs and stack traces, follow-up comments
   file_tickets.py             files the tickets as GitHub issues (idempotent, by a hidden id in the body)
-  reset.py                    deletes agent comments, removes labels, reopens issues, closes rca/* draft PRs,
-                              deletes rca/* branches
+  reset.py                    GitHub state only: deletes agent comments, removes labels, reopens issues, closes
+                              rca/* draft PRs, deletes rca/* branches. It never touches git history.
   score.py                    reads back comments, labels, PRs and runs hidden tests; writes a scorecard
   private/                    git-ignored: the answer key and hidden tests (see "Answer key")
 ```
@@ -65,46 +66,54 @@ rca-lab/                      the harness (what the evaluator uses)
 ## Git history
 
 The regressions must be real commits so the agent's `git log`, `git blame` and regression-window tools find them.
-The service is committed in steps on `main`:
+The service is committed in steps on `main`, history append-only (never rewritten or force-pushed):
 
 1. `billing-service-v1.0.0`: the clean release, all specs met.
-2. A handful of ordinary-looking feature commits ("Support half-up rounding for premiums", "Grace period from
-   config", "Portal: show amounts in the member's locale", "Update holidaycal to 1.3.0", ...), each slipping in one
-   defect.
-3. `billing-service-v1.1.0` and `billing-service-v1.2.0` tag points between them, so tickets can report
-   "worked in 1.0.0, broken in 1.2.0" and the regression window is meaningful.
+2. Ordinary-looking feature commits, each touching only `billing-service/` and each slipping in one defect.
+3. `billing-service-v1.1.0` and `billing-service-v1.2.0` release tags between them, so tickets can report the version
+   they saw and the regression window is meaningful. Tags are prefixed because the monorepo holds other apps.
 
-CI stays green throughout: the shipped tests don't catch the planted bugs (that is the point), and the
-target gets its own job in `ci.yml` (ruff, pytest with the 95% coverage gate, `node --test` for the portal).
+CI stays green throughout: neither the shipped tests nor each feature's own new tests catch the planted defect (that
+is the point), and the target has its own job in `ci.yml` (ruff, pytest with the 95% coverage gate, `node --test` for
+the portal).
 
 ## Ticket catalogue
 
-About 16 issues, covering every class. "Evidence" is what the issue gives the agent; varying it tests whether the
-agent works from stack traces, from descriptions, and from git history. "Repro" lists the surfaces that can
-reproduce the defect (see below).
+16 issues covering every class. This public table deliberately gives only the class and the kind of evidence; the
+planted cause, culprit line, introducing commit, owner and evidence values of each ticket are in the answer key
+(`rca-lab/private/`, never committed). An earlier version of this doc, still in git history, described planned
+defects; several changed before they were built.
 
-| # | Class | Planted cause | Evidence in the issue | Repro |
-|---|---|---|---|---|
-| T01 | code bug | Off-by-one in month arithmetic: December due dates land in the wrong year (`dates.py`) | Description, expected vs actual dates | unit, API |
-| T02 | code bug | Premium rounding: banker's rounding where the spec says half-up | API response excerpt, amounts off by a cent | unit, API |
-| T03 | code bug | `if`/`elif` order makes the multi-policy discount for 3+ policies unreachable | Customer complaint, no logs | unit, API |
-| T04 | code bug | `KeyError` from a dict lookup for a state missing from a table | Full stack trace from the service log | unit, API |
-| T05 | code bug | Refund counts the cancellation day on the wrong side (`refunds.py`) | Log line with the computed amount | unit, API |
-| T06 | code bug (TS) | Portal month index is off by one, shows the wrong month (`portal/src/dates.ts`) | Page text quoted, console output | unit (TS), UI |
-| T07 | code bug (TS) | Cents not zero-padded: `$1.05` shown as `$1.5` (`portal/src/money.ts`) | Portal text quoted | unit (TS), UI |
-| T08 | configuration | `grace_days` in `config/billing.yaml` doesn't match the spec | Lapse notices sent too early | unit, API |
-| T09 | data | A duplicated row in `reference/rate_tables.csv`; the loader keeps the last one | Wrong premium for one territory | unit, API |
-| T10 | environment | The reporter's deployment sets `BILLING_TIMEZONE=UTC`; config and spec say `America/New_York`, so a 10 pm Eastern payment counts as next day and draws a late fee | Environment block with the variable, a log line with the UTC timestamp, a "not on staging" comment | API (with the variable set) |
-| T11 | test defect | A test depends on module state set by another test; fails when run alone | CI-style output of `pytest -k` | unit only |
-| T12 | third-party | The vendored `holidaycal` (updated to 1.3.0) computes Thanksgiving as the last Thursday instead of the fourth; its upstream changelog fixes it in 1.3.1 | Wrong renewal-notice date in a November with five Thursdays | unit, API |
-| T13 | duplicate | Same root cause as T02, different words and a different customer | Amounts off by a cent | (as T02) |
-| T14 | not a bug | Reporter expects the cancellation fee refunded; the spec says it never is | Quote from the member | none |
-| T15 | needs more info | "Billing is broken" with no version, steps or logs | Nothing useful | none |
-| T16 | code bug, regression | Introduced by a later feature commit; worked in v1.0.0 | "Worked last month" | unit, API |
+| # | Class | Evidence in the issue | Repro |
+|---|---|---|---|
+| T01 | code bug | Description, expected vs actual dates | unit, API |
+| T02 | code bug | API response excerpt, amounts off by a cent | unit, API |
+| T03 | code bug | Customer complaint, no logs | unit, API |
+| T04 | code bug | Full stack trace from the service log | unit, API |
+| T05 | code bug | Amounts from a refund quote | unit, API |
+| T06 | code bug (TS) | Page text quoted, the member's timezone | unit (TS), UI |
+| T07 | code bug (TS) | Page text quoted | unit (TS), UI |
+| T08 | configuration | Policies lapsing earlier than members expect | unit, API |
+| T09 | data | Wrong premium for one territory and product | unit, API |
+| T10 | environment | Environment block, a log line with a UTC timestamp, a "not on staging" comment | API (with the reporter's environment) |
+| T11 | test defect | CI-style output of a single test run | unit only |
+| T12 | third-party | A wrong holiday date; a follow-up comment quoting the library's upstream release notes | unit, API |
+| T13 | duplicate | Same symptom as another ticket, different words and customer | (as its original) |
+| T14 | not a bug | Quote from the member | none |
+| T15 | needs more info | Nothing useful, no version | none |
+| T16 | code bug, regression | "Worked last month", the version that worked | unit, API, UI |
+
+Every issue except T15 states the version the reporter saw (the `/health` `version`, e.g. `1.2.0`), so Level 1 can
+pick a regression window even after `main` moves on.
 
 Environment issues (T10) can only be inferred at Level 1 from details in the issue text, since the agent doesn't
 run code there. The ticket therefore always carries the clues: the variable in the environment block, the UTC
 timestamp in a log line, and a comment that it doesn't happen elsewhere. Without them Level 1 could only guess.
+
+Third-party evidence (T12): the agent can reach only GitHub and the model, and a vendored copy can't contain a newer
+release's changelog. So the justification for "upgrade" comes from the repo and the issue: `THIRD_PARTY.md` has a
+"Latest upstream" column showing the newer version, and a follow-up comment on the issue quotes that version's
+release notes. No upstream fetching in v1.
 
 ## Reproduction surfaces
 

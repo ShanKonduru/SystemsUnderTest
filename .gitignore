@@ -223,3 +223,6 @@ __marimo__/
 **/data/
 **/letters/
 .env
+
+# The RCA lab answer key and hidden tests: never committed (the repo is public and the agent reads it)
+rca-lab/private/
