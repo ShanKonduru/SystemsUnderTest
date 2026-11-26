@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from . import __version__
+from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .errors import BillingError, Conflict, NotFound
 from .money import fmt
@@ -214,6 +215,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log.info("cancel policy=%s cancel_date=%s kind=%s refund=%s", policy_id, body.cancel_date, quote.kind,
                  fmt(quote.refund))
         return {**_refund_json(policy_id, quote), "status": "cancelled"}
+
+    @app.get("/calendar/holidays")
+    def holidays(year: int) -> dict[str, Any]:
+        """The federal holidays the billing calendar skips (BR-14), as observed."""
+        if not 2000 <= year <= 2100:
+            raise BillingError("year must be between 2000 and 2100")
+        days = sorted(holidaycal.holidays(year).items())
+        return {"year": year, "holidays": [{"date": day.isoformat(), "name": name} for day, name in days]}
 
     @app.get("/portal", include_in_schema=False)
     def portal() -> Response:

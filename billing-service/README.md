@@ -85,6 +85,7 @@ should pin the browser's timezone and locale to the member's rather than rely on
 | `GET /policies/{id}/renewal` | Renewal date, notice date, eligibility, renewal premium |
 | `GET /policies/{id}/refund-quote?cancel_date=` | What a cancellation on that date would refund |
 | `POST /policies/{id}/cancel` | `{cancel_date}` → cancels and records the refund |
+| `GET /calendar/holidays?year=` | The federal holidays (as observed) that renewal notices skip |
 | `GET /portal?policy=P-5001` | The member billing page |
 
 Money is sent as strings with two decimals. Refused requests answer 4xx with `{error, detail}`. Any other error
