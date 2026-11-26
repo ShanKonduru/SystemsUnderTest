@@ -53,6 +53,24 @@ node portal\build.mjs                 :: builds portal\dist for the /portal page
 | `BILLING_CONFIG`, `BILLING_RATES` | `config/billing.yaml`, `reference/rate_tables.csv` | Alternative config or rate table |
 | `BILLING_SANDBOX_TOKEN` | empty | Token for `/sandbox/status` and `/sandbox/reset` (header `X-Sandbox-Token`); empty refuses both |
 
+### Running a particular version
+
+Every release is tagged `billing-service-v<version>` (see [`CHANGELOG.md`](CHANGELOG.md)). To run one, check out the
+tag and start the service as above with a fresh `BILLING_DATA` directory, so the database is seeded from that
+version's code:
+
+```bat
+git checkout billing-service-v1.1.0
+set BILLING_DATA=%TEMP%illing-1.1.0
+node portaluild.mjs
+.venv\Scripts\python -m billing
+curl http://127.0.0.1:8500/health      :: {"status": "ok", "version": "1.1.0", "today": "2026-11-03"}
+```
+
+The service reads every setting at start-up. It never uses the machine's timezone (`TZ`): payments are dated in the
+billing timezone, `BILLING_TIMEZONE` or the config file's. The portal page runs in the member's browser, so a UI test
+should pin the browser's timezone and locale to the member's rather than rely on the test machine's.
+
 ## API
 
 | Method and path | What it does |
