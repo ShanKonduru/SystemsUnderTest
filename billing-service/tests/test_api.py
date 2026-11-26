@@ -32,7 +32,8 @@ def test_quote(client: TestClient) -> None:
 def test_quote_errors_are_4xx(client: TestClient) -> None:
     r = client.post("/quotes", json={"state": "TX", "product": "home"})
     assert r.status_code == 422
-    assert r.json() == {"error": "unknown_territory", "detail": "no home rate for state 'TX'"}
+    assert r.json() == {"error": "unknown_territory",
+                        "detail": "Harbor Mutual doesn't write policies in 'TX'; it writes in CT, MA, NJ, NY, PA, VT"}
     assert client.post("/quotes", json={"state": "NJ", "product": "auto"}).json()["error"] == "invalid"
 
 

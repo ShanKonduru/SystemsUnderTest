@@ -61,7 +61,7 @@ def test_settings_from_yaml_and_environment(tmp_path: Path) -> None:
 def test_rate_table_lookup() -> None:
     rates = load_rates(DEFAULT_RATES)
     assert rates.base_rate("nj", "auto") == Decimal("1517.85")
-    assert rates.states() == ["CT", "MA", "NJ", "NY", "PA"]
+    assert rates.states() == ["CT", "MA", "NJ", "NY", "PA", "VT"]
     with pytest.raises(UnknownTerritory, match="no auto rate for state 'TX'"):
         rates.base_rate("TX", "auto")
 

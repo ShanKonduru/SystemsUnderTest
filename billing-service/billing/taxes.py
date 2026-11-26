@@ -9,6 +9,7 @@ PREMIUM_TAX_RATES = {
     "NJ": Decimal("0.0210"),
     "NY": Decimal("0.0200"),
     "PA": Decimal("0.0200"),
+    "VT": Decimal("0.0024"),
 }
 
 

@@ -5,8 +5,9 @@ Owner: Billing product team. Applies from billing service 1.0.0. Rule ids are re
 ## Premiums
 
 **BR-01 Base rate.** Every quote starts from the base rate for the policy's state and product in
-`reference/rate_tables.csv`. Harbor Mutual writes auto, home and renters in CT, MA, NJ, NY and PA. A quote for any
-other state or product is refused (`unknown_territory`), never priced from a default.
+`reference/rate_tables.csv`. Harbor Mutual writes auto, home and renters in CT, MA, NJ, NY, PA and (from 1.4.0) VT. A quote for any
+other state or product is refused (`unknown_territory`), never priced from a default. State codes may be sent in
+any case (`nj` is NJ).
 
 **BR-02 Factors.** The base rate is multiplied by:
 
@@ -34,9 +35,9 @@ paperless: 1517.85 x 1.25 x 1.15 x 0.88 = 1920.08025, premium **1920.08**.
 The tax is the premium times the state's rate, rounded half-up to cents; it is collected for the state and is not part
 of the premium (discounts, installments and refunds work on the premium alone).
 
-| State | CT | MA | NJ | NY | PA |
-|---|---|---|---|---|---|
-| Premium tax rate | 1.75% | 2.28% | 2.10% | 2.00% | 2.00% |
+| State | CT | MA | NJ | NY | PA | VT |
+|---|---|---|---|---|---|---|
+| Premium tax rate | 1.75% | 2.28% | 2.10% | 2.00% | 2.00% | 2.40% |
 
 ## Installments
 

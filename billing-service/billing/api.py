@@ -24,7 +24,7 @@ from .money import fmt
 from .notify import Gateway
 from .payments import assess_payment, late_fee_on, received_date
 from .premiums import quote_premium
-from .rates import load_rates
+from .rates import UnknownTerritory, load_rates
 from .refunds import RefundQuote, premium_paid, refund_quote
 from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
@@ -99,6 +99,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/quotes")
     def quote(body: QuoteRequest) -> dict[str, Any]:
+        if body.state not in rates.states():
+            raise UnknownTerritory(f"Harbor Mutual doesn't write policies in {body.state!r}; it writes in "
+                                   f"{', '.join(rates.states())}")
         q = quote_premium(rates, **body.model_dump())
         tax = premium_tax(body.state, q.premium)
         return {
