@@ -1,0 +1,15 @@
+{
+  // For editors and an optional `tsc --noEmit`; Node runs the sources directly by stripping the types.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src", "test"]
+}

@@ -146,6 +146,33 @@ jobs:
       - name: docker image builds
         run: docker compose build
 
+  # The RCA agent's target: a billing service (Python) and the member portal's billing page (TypeScript). No image.
+  sut-billing-service:
+    name: billing service
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: billing-service
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "24"
+      - name: install
+        run: python -m pip install -r requirements.txt pytest pytest-cov httpx ruff
+      - name: lint
+        run: ruff check billing tests
+      - name: offline tests + 95% coverage gate
+        run: python -m pytest -q --cov
+      - name: portal tests
+        working-directory: billing-service/portal
+        run: npm test
+      - name: portal page builds
+        run: node portal/build.mjs
+
   # The Windows desktop app: no Python and no image. It builds with the C# compiler that ships with Windows; the
   # self-test covers prices, rules, the store, options and every UI release rule. (tools\smoke.bat drives the real
   # UI and needs an interactive desktop, so it runs locally, not here.)
@@ -180,7 +207,7 @@ jobs:
   # Tags: sha-<commit> (what TruAssure pins) and latest.
   publish-images:
     name: publish images
-    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-expense-agent, sut-multi-agent-desk, sut-automation-lab, sut-policy-desk]
+    needs: [sut-llm-factory, sut-chat-assistant, sut-claims-agent, sut-expense-agent, sut-multi-agent-desk, sut-automation-lab, sut-billing-service, sut-policy-desk]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

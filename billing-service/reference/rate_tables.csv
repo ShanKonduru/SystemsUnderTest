@@ -1,0 +1,16 @@
+state,product,base_rate
+CT,auto,1288.40
+CT,home,1046.75
+CT,renters,214.30
+MA,auto,1402.15
+MA,home,1133.60
+MA,renters,236.45
+NJ,auto,1517.85
+NJ,home,1098.20
+NJ,renters,198.65
+NY,auto,1655.30
+NY,home,1204.90
+NY,renters,247.15
+PA,auto,1127.45
+PA,home,962.35
+PA,renters,176.80

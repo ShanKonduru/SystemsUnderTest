@@ -1,0 +1,12 @@
+{
+  "name": "@harbor-mutual/portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Member-portal formatting and validation, and the billing page the billing service serves at /portal.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test \"test/*.test.ts\""
+  }
+}

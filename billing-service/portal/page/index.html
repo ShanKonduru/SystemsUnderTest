@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harbor Mutual - My billing</title>
+  <link rel="stylesheet" href="/portal/portal.css">
+  <script type="module" src="/portal/app.js"></script>
+</head>
+<body>
+  <header><h1>Harbor Mutual</h1><p>My billing</p></header>
+  <main>
+    <p id="load-error" role="alert"></p>
+    <section aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Policy <span id="policy-id"></span></h2>
+      <dl>
+        <dt>Product</dt><dd id="product"></dd>
+        <dt>Annual premium</dt><dd id="premium"></dd>
+        <dt>Status</dt><dd id="status"></dd>
+        <dt>Renews on</dt><dd id="renewal"></dd>
+        <dt>Next payment</dt><dd><span id="next-due"></span> <strong id="next-due-label"></strong></dd>
+      </dl>
+    </section>
+    <section aria-labelledby="schedule-heading">
+      <h2 id="schedule-heading">Installments</h2>
+      <table>
+        <thead><tr><th>#</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody id="schedule-rows"></tbody>
+      </table>
+    </section>
+    <section aria-labelledby="pay-heading">
+      <h2 id="pay-heading">Make a payment</h2>
+      <form id="pay-form" hidden>
+        <label>Amount <input name="amount" id="amount" inputmode="decimal"></label>
+        <label>Card number <input name="card" id="card" inputmode="numeric" autocomplete="cc-number"></label>
+        <label>Expiry month <input name="exp-month" id="exp-month" inputmode="numeric"></label>
+        <label>Expiry year <input name="exp-year" id="exp-year" inputmode="numeric"></label>
+        <label>ZIP code <input name="zip" id="zip" inputmode="numeric"></label>
+        <button type="submit" id="pay-button">Pay now</button>
+        <ul id="pay-errors" role="alert"></ul>
+        <p id="pay-result" role="status"></p>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Owning teams for the billing service, in CODEOWNERS syntax (paths from the repository root; the last matching
+# pattern wins). Kept here rather than in .github/ because these are Harbor Mutual's internal teams, not GitHub teams.
+
+/billing-service/                           @harbor-mutual/billing-core
+
+/billing-service/billing/rates.py           @harbor-mutual/rating
+/billing-service/reference/                 @harbor-mutual/rating
+
+/billing-service/billing/renewals.py        @harbor-mutual/policy-servicing
+/billing-service/billing/refunds.py         @harbor-mutual/policy-servicing
+
+/billing-service/billing/_vendor/           @harbor-mutual/platform
+/billing-service/THIRD_PARTY.md             @harbor-mutual/platform
+/billing-service/config/                    @harbor-mutual/platform
+
+/billing-service/portal/                    @harbor-mutual/member-portal
+
+/billing-service/tests/                     @harbor-mutual/qa-automation
+
+/billing-service/docs/specs/                @harbor-mutual/product-owners
+/billing-service/docs/specs/portal-display.md  @harbor-mutual/member-portal
