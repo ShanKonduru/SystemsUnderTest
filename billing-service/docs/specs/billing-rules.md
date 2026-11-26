@@ -98,6 +98,12 @@ receipt it issued and refuse one that was altered or that it didn't issue.
 installment due November 30 is reminded on November 23, one due March 3 on February 24, one due January 1 on
 December 25 of the year before. Paid installments and cancelled policies get no reminders.
 
+**BR-23 Monthly statements.** A customer's statement for a calendar month lists every installment due that month
+on each of their policies that isn't cancelled: the policy, the installment, its due date, its total (amount plus
+installment fee, BR-06) and whether it is paid. The statement's amount due is the sum of the totals of its unpaid
+installments: installment fees are part of what the member owes, on every plan that has one. Late fees aren't on the
+statement, because they depend on the day a payment arrives. Any month can be asked for, past or future.
+
 **BR-18 Reminder delivery.** Each day the reminders due that day (BR-15) are handed to the notification gateway,
 which emails paperless customers and mails everyone else. A reminder gives the policy, the installment, its due date
 and the amount due (premium plus installment fee). A delivery the gateway refuses is reported, and the others still

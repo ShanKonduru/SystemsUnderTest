@@ -30,6 +30,7 @@ from .refunds import RefundQuote, premium_paid, refund_quote
 from .reinstatement import Reinstatement, reinstatement_terms
 from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
+from .statements import amount_due, statement_lines
 from .store import Store
 from .taxes import premium_tax
 
@@ -123,6 +124,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/customers/{customer_id}")
     def customer(customer_id: str) -> dict[str, Any]:
         return store.customer(customer_id)
+
+    @app.get("/customers/{customer_id}/statement")
+    def statement(customer_id: str, month: str) -> dict[str, Any]:
+        """The customer's statement for `month` (2026-11): installments due that month on policies in force (BR-23)."""
+        c = store.customer(customer_id)
+        rows = [r for pid in c["policies"] if store.policy(pid)["cancelled_on"] is None
+                for r in store.installments(pid)]
+        lines = statement_lines(month, rows)
+        return {
+            "customer_id": c["id"], "name": c["name"], "month": month,
+            "lines": [{"policy_id": line.policy_id, "installment": line.installment,
+                       "due_date": line.due_date.isoformat(), "total": fmt(line.total), "paid": line.paid}
+                      for line in lines],
+            "amount_due": fmt(amount_due(lines)),
+        }
 
     @app.get("/policies/{policy_id}")
     def policy(policy_id: str) -> dict[str, Any]:
