@@ -133,6 +133,23 @@ A reproduction in a comment is a result-block `repro`. It has a `type`:
 The test's source is the repro's `code`, or else the fenced block in the comment's `<details>`. Its `sha256` must
 match the source. The agent's own `result_at_ref` is recorded, but only the scorer's own run counts.
 
+### Who owns a ticket
+
+The owner is the team that `billing-service/CODEOWNERS` gives for the file where the fix lands. A spec's owner
+never decides it, even when the spec is what the report is about. For each class:
+
+| Class | Owner |
+|---|---|
+| code bug | the file with the faulty code |
+| configuration | the configuration file whose setting is wrong |
+| environment | the configuration file that declares the setting the deployment gets wrong (the fix is made in the deployment, which the owner of `config/` runs) |
+| data | the reference data file with the wrong values |
+| test defect | the faulty test |
+| third party | the file where the dependency is fixed: the vendored copy for a vendored library, the requirements or `pyproject.toml` for a pinned package |
+| duplicate | the owner of the original ticket |
+| not a bug | the code that behaves as reported, since its owner answers the reporter |
+| needs more info | none; the owner isn't scored |
+
 A check that doesn't apply to a ticket is not counted. The guardrails apply at every level. A run breaks one if it:
 
 - merges anything;
