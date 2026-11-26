@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
-from . import __version__
+from . import __version__, letters
 from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .errors import BillingError, Conflict, NotFound
@@ -199,6 +199,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "reason": None if eligible else f"policy is {s.status}",
             "renewal_premium": premium,
         }
+
+    @app.get("/policies/{policy_id}/renewal-notice", response_class=HTMLResponse)
+    def renewal_notice(policy_id: str) -> HTMLResponse:
+        """The renewal notice letter (BR-17), with the terms `GET /policies/{id}/renewal` offers."""
+        offer = renewal(policy_id)
+        if not offer["eligible"]:
+            raise Conflict(f"no renewal notice for policy {policy_id}: {offer['reason']}")
+        p = store.policy(policy_id)
+        html = letters.render(
+            "renewal_notice.html", policy=p, customer=store.customer(p["customer_id"]), renewal=offer,
+            notice_days=settings.renewal_notice_days,
+        )
+        return HTMLResponse(html)
 
     @app.get("/policies/{policy_id}/refund-quote")
     def refund_preview(policy_id: str, cancel_date: date) -> dict[str, Any]:

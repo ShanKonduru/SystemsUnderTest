@@ -22,6 +22,7 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 | `billing/payments.py` | The billing day (Eastern time), exact amounts, late fees |
 | `billing/reminders.py` | Payment reminder dates |
 | `billing/renewals.py` | Standing (active / past due / lapsed), renewal dates, renewal notice dates |
+| `billing/letters.py`, `billing/templates/` | Letters to members (the renewal notice), rendered from HTML templates |
 | `billing/refunds.py` | Free-look and pro-rata refunds |
 | `billing/rates.py`, `reference/rate_tables.csv` | The rate table |
 | `billing/taxes.py` | State premium tax on quotes |
@@ -109,6 +110,7 @@ git worktree remove --force ..\billing-1.1.0
 | `POST /policies/{id}/payments` | `{amount, received_at}` (ISO 8601 with offset) → pays the earliest unpaid installment |
 | `GET /policies/{id}/reminders` | Payment reminders for the unpaid installments: remind on, sent or scheduled |
 | `GET /policies/{id}/renewal` | Renewal date, notice date, eligibility, renewal premium |
+| `GET /policies/{id}/renewal-notice` | The renewal notice letter as an HTML page (BR-17); 409 when the policy isn't offered a renewal |
 | `GET /policies/{id}/refund-quote?cancel_date=` | What a cancellation on that date would refund |
 | `POST /policies/{id}/cancel` | `{cancel_date}` → cancels and records the refund |
 | `GET /calendar/holidays?year=` | The federal holidays (as observed) that renewal notices skip |

@@ -92,3 +92,7 @@ force when the offer is made, with the customer's current number of active polic
 **BR-14 Renewal notice.** The renewal notice is sent **45 days** before the renewal date. When that day is a Saturday,
 a Sunday or a US federal holiday (as observed), it is sent on the business day before, so the member always gets at
 least 45 days' notice. Holidays come from the `holidaycal` library (see `THIRD_PARTY.md`).
+
+**BR-17 Renewal notice letter.** The renewal notice is a letter, dated on the notice day (BR-14), addressed to the
+customer by name. It gives the policy, the renewal date and the renewal premium (BR-13), dates written out in full
+("January 31, 2027") and money as dollars ("$1,411.60"). A policy that isn't offered a renewal gets no letter.

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your renewal notice, policy {{ policy.id }}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 40rem; margin: 2rem auto; line-height: 1.5; color: #1d2733; }
+  .terms { border-collapse: collapse; margin: 1rem 0; }
+  .terms th { text-align: left; padding-right: 2rem; font-weight: normal; color: #4a5866; }
+  .footer { margin-top: 2rem; font-size: 0.85rem; color: #4a5866; }
+</style>
+</head>
+<body>
+<article{{ {"class": "letter renewal-notice", "data-policy": policy.id, "data-sent": renewal.notice_date}|xmlattr }}>
+  <p>Harbor Mutual Insurance<br>Member Services</p>
+  <p>{{ renewal.notice_date|long_date }}</p>
+  <p>Dear {{ customer.name }},</p>
+  <p>Your {{ policy.product }} policy {{ policy.id }} renews on <strong>{{ renewal.renewal_date|long_date }}</strong>.
+     Here are the terms we are offering for the next year.</p>
+  <table class="terms">
+    <tr><th>Policy</th><td>{{ policy.id }} ({{ policy.product }}, {{ policy.coverage }} coverage)</td></tr>
+    <tr><th>Renewal date</th><td>{{ renewal.renewal_date|long_date }}</td></tr>
+    <tr><th>Annual premium</th><td>{{ renewal.renewal_premium|dollars }}</td></tr>
+    <tr><th>Payment plan</th><td>{{ policy.plan }}</td></tr>
+  </table>
+  <p>You don't need to do anything: the policy renews on these terms unless you tell us otherwise before the renewal
+     date. To change your coverage or payment plan, call us or visit the member portal.</p>
+  <p>Thank you for insuring with Harbor Mutual.</p>
+  <p class="footer">Harbor Mutual is a fictitious insurer. This notice is sent at least {{ notice_days }} days before
+     your renewal date.</p>
+</article>
+</body>
+</html>
