@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from .errors import BillingError
-from .money import to_money
+from .money import CENT, to_money
 from .rates import PRODUCTS, RateTable
 
 COVERAGE_FACTORS = {"basic": Decimal("0.85"), "standard": Decimal("1.00"), "plus": Decimal("1.25")}
@@ -18,6 +18,8 @@ class Quote:
     age_factor: Decimal
     subtotal: Decimal
     discount_rate: Decimal
+    multi_policy_discount: Decimal
+    paperless_discount: Decimal
     discount: Decimal
     premium: Decimal
 
@@ -66,14 +68,18 @@ def quote_premium(
     base = rates.base_rate(state, product)
     cov, age = COVERAGE_FACTORS[coverage], age_factor(product, driver_age)
     subtotal = base * cov * age
-    discount_rate = multi_policy_discount(policy_count) + (PAPERLESS_DISCOUNT if paperless else Decimal("0.00"))
-    premium = to_money(subtotal * (1 - discount_rate))
+    multi = multi_policy_discount(policy_count)
+    paper = PAPERLESS_DISCOUNT if paperless else Decimal("0.00")
+    discount_rate = multi + paper
+    premium = (subtotal * (1 - discount_rate)).quantize(CENT)
     return Quote(
         base_rate=base,
         coverage_factor=cov,
         age_factor=age,
         subtotal=to_money(subtotal),
         discount_rate=discount_rate,
+        multi_policy_discount=to_money(subtotal * multi),
+        paperless_discount=to_money(subtotal * paper),
         discount=to_money(subtotal) - premium,
         premium=premium,
     )

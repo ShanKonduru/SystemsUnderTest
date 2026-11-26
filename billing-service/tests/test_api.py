@@ -24,7 +24,7 @@ def test_quote(client: TestClient) -> None:
     assert r.status_code == 200
     assert r.json() == {
         "base_rate": "1517.85", "coverage_factor": "1.00", "age_factor": "1.00", "subtotal": "1517.85",
-        "discount_rate": "0.07", "discount": "106.25", "premium": "1411.60", "premium_tax": "29.64",
+        "discount_rate": "0.07", "multi_policy_discount": "75.89", "paperless_discount": "30.36", "discount": "106.25", "premium": "1411.60", "premium_tax": "29.64",
         "total": "1441.24", "currency": "USD",
     }
 

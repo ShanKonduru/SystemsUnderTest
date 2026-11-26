@@ -76,7 +76,7 @@ should pin the browser's timezone and locale to the member's rather than rely on
 | Method and path | What it does |
 |---|---|
 | `GET /health` | Status, version and the service's today |
-| `POST /quotes` | `{state, product, coverage, driver_age?, policy_count, paperless}` → premium breakdown |
+| `POST /quotes` | `{state, product, coverage, driver_age?, policy_count, paperless}` → premium breakdown with each discount, premium tax and total |
 | `GET /customers/{id}` | Customer and their policy ids |
 | `GET /policies/{id}` | Policy, renewal date, status, standing (installment, due date, grace end, lapse date) and `next_payment`: what a payment made today must be, late fee included |
 | `GET /policies/{id}/schedule` | Installments: due date, amount, fee, total, paid on, late fee |

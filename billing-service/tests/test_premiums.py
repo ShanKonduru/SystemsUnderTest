@@ -15,6 +15,8 @@ def test_quote_breakdown(rates: RateTable) -> None:
     assert (q.coverage_factor, q.age_factor) == (Decimal("1.00"), Decimal("1.00"))
     assert q.subtotal == Decimal("1517.85")
     assert q.discount_rate == Decimal("0.07")
+    assert q.multi_policy_discount == Decimal("75.89")  # 5% of 1517.85 = 75.8925
+    assert q.paperless_discount == Decimal("30.36")  # 2% = 30.357
     assert q.premium == Decimal("1411.60")
     assert q.discount == Decimal("106.25")
 
@@ -23,7 +25,7 @@ def test_young_driver_basic_coverage(rates: RateTable) -> None:
     # 1655.30 x 0.85 x 1.60 = 2251.208
     q = quote_premium(rates, state="NY", product="auto", coverage="basic", driver_age=22)
     assert q.premium == Decimal("2251.21")
-    assert q.discount == Decimal("0.00")
+    assert q.discount == q.multi_policy_discount == q.paperless_discount == Decimal("0.00")
 
 
 def test_only_the_final_premium_is_rounded(rates: RateTable) -> None:

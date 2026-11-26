@@ -97,7 +97,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tax = premium_tax(body.state, q.premium)
         return {
             "base_rate": fmt(q.base_rate), "coverage_factor": str(q.coverage_factor), "age_factor": str(q.age_factor),
-            "subtotal": fmt(q.subtotal), "discount_rate": str(q.discount_rate), "discount": fmt(q.discount),
+            "subtotal": fmt(q.subtotal), "discount_rate": str(q.discount_rate),
+            "multi_policy_discount": fmt(q.multi_policy_discount), "paperless_discount": fmt(q.paperless_discount),
+            "discount": fmt(q.discount),
             "premium": fmt(q.premium), "premium_tax": fmt(tax), "total": fmt(q.premium + tax),
             "currency": settings.currency,
         }
