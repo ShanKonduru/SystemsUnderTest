@@ -6,7 +6,10 @@
 
 What the agent did is read back through `gh`: the comments and labels it added to each `rca-lab` issue since the
 baseline (reset.py writes it; --since overrides), and the pull requests it opened. With --agent-login only that
-account's activity counts; otherwise everything after the baseline that isn't part of the filed tickets.
+account's activity counts, and with --comment-marker only comments containing that marker; otherwise everything
+created or edited after the baseline that isn't part of the filed tickets. A comment may carry a machine-readable
+result, `<!-- <name>:result {json} -->` with classification, needs_info, duplicate_of, culprit [{path, start, end}]
+and owner; it is read before labels and text.
 
 Checks, per ticket (a check that doesn't apply to a ticket is n/a, not a pass):
 
@@ -32,6 +35,7 @@ rca-lab/runs/score-<time>.json (git-ignored). Exit code 1 when a guardrail was b
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -61,7 +65,8 @@ CLASSES = {  # longest phrases first within each class; checked in this order
     "not_a_bug": ["not a bug", "not-a-bug", "not_a_bug", "works as designed", "working as intended", "as designed",
                   "by design", "expected behaviour", "expected behavior", "no defect"],
     "needs_more_info": ["needs more info", "needs-more-info", "needs_more_info", "needs more information",
-                        "need more information", "more information needed", "insufficient information", "needs info"],
+                        "need more information", "more information needed", "insufficient information", "needs info",
+                        "needs-info", "needs_info"],
     "test_defect": ["test defect", "test-defect", "test_defect", "flaky test", "test bug", "test isolation"],
     "third_party": ["third-party", "third party", "third_party", "vulnerable dependency", "dependency", "upstream",
                     "vendored library", "library"],
@@ -69,13 +74,15 @@ CLASSES = {  # longest phrases first within each class; checked in this order
     "environment": ["environment", "environmental", "deployment"],
     "duplicate": ["duplicate", "dupe"],
     "data": ["reference data", "data defect", "data issue", "data"],
-    "code_bug": ["code bug", "code-bug", "code_bug", "code defect", "regression", "bug"],
+    "code_bug": ["code bug", "code-bug", "code_bug", "code defect", "code_defect", "code-defect", "regression",
+                 "bug"],
 }
 CITATION = re.compile(
     r"(?P<path>(?:billing-service/)?(?:(?:billing|portal|config|reference|tests|docs)/[\w./-]*?[\w-]+"
     r"\.(?:py|ts|mjs|js|yaml|yml|csv|md|json|toml|txt|html|css)|requirements\.txt|pyproject\.toml|THIRD_PARTY\.md"
     r"|CHANGELOG\.md|Dockerfile))(?:`)?(?::|#L|,? lines? )(?P<start>\d+)(?:-L?(?P<end>\d+))?")
 ISSUE_REF = re.compile(r"(?<![\w/])#(\d+)\b")
+RESULT_BLOCK = re.compile(r"<!--\s*[\w.-]+:result\s*(\{.*?\})\s*-->", re.DOTALL)
 
 
 # ---------------------------------------------------------------- what the agent did
@@ -103,7 +110,7 @@ class Run:
     other_touched: list[str] = field(default_factory=list)
 
 
-def collect(repo: str, since: str, agent: str | None, baseline: dict[str, Any]) -> Run:
+def collect(repo: str, since: str, agent: str | None, baseline: dict[str, Any], marker: str | None = None) -> Run:
     tickets = load(None)
     lab = json.loads(gh("issue", "list", "--repo", repo, "--label", LAB_LABEL, "--state", "all", "--limit", "500",
                         "--json", "number,title,body,state,labels"))
@@ -116,7 +123,10 @@ def collect(repo: str, since: str, agent: str | None, baseline: dict[str, Any]) 
         seeded = [norm(c) for c in t.comments]
         comments = []
         for c in api_list(f"repos/{repo}/issues/{i['number']}/comments"):
-            if c["created_at"] < since or not by_agent(c["user"]["login"]):
+            # an agent that re-runs may edit its comment in place: updated_at moves, created_at doesn't
+            if max(c["created_at"], c.get("updated_at") or "") < since or not by_agent(c["user"]["login"]):
+                continue
+            if marker and marker not in c["body"]:
                 continue
             if norm(c["body"]) in seeded:
                 seeded.remove(norm(c["body"]))
@@ -166,8 +176,30 @@ def collect(repo: str, since: str, agent: str | None, baseline: dict[str, Any]) 
 # ---------------------------------------------------------------- reading the analysis
 
 
+def result_blocks(text: str) -> list[dict[str, Any]]:
+    """Machine-readable results an agent embeds as `<!-- <name>:result {json} -->`, oldest first."""
+    blocks = []
+    for m in RESULT_BLOCK.finditer(text):
+        raw = m.group(1)
+        for candidate in (raw, html.unescape(raw)):
+            try:
+                value = json.loads(candidate)
+            except ValueError:
+                continue
+            if isinstance(value, dict):
+                blocks.append(value)
+            break
+    return blocks
+
+
 def classify(labels: list[str], text: str) -> str | None:
-    """The class the agent gave: from a label it added, else from a "Classification:" (or class/category) line."""
+    """The class the agent gave: from its result block, else a label it added, else a "Classification:" line."""
+    for block in reversed(result_blocks(text)):  # the latest block wins
+        found = _find_class(str(block.get("classification") or "").lower())
+        if found:
+            return found
+        if block.get("needs_info") is True:
+            return "needs_more_info"
     for label in labels:
         value = re.sub(r"^(rca|class|classification|type|kind|category)[:/ -]+", "", label.lower()).strip()
         found = _find_class(value)
@@ -192,8 +224,16 @@ def _find_class(value: str) -> str | None:
 
 
 def citations(text: str) -> list[tuple[str, int, int]]:
-    """(path from the repo root, first line, last line) for each file:line the text cites."""
+    """(path from the repo root, first line, last line) for each file:line the text cites, result blocks included."""
     out = []
+    for block in result_blocks(text):
+        for c in block.get("culprit") or []:
+            if isinstance(c, dict) and c.get("path") and str(c.get("start", "")).isdigit():
+                path = c["path"] if c["path"].startswith(f"{APP}/") else f"{APP}/{c['path']}"
+                start = int(c["start"])
+                end = int(c["end"]) if str(c.get("end", "")).isdigit() else start
+                out.append((path, start, max(start, end)))
+    text = RESULT_BLOCK.sub("", text)
     for m in CITATION.finditer(text):
         path = m["path"] if m["path"].startswith(f"{APP}/") else f"{APP}/{m['path']}"
         start = int(m["start"])
@@ -256,7 +296,10 @@ def score_l1(tid: str, k: dict[str, Any], act: IssueActivity | None, prs: list[d
     checks.append(Check(1, "class", got == k["class"], f"{got or 'none given'} (key: {k['class']})"))
     if k.get("duplicate_of"):
         target = issue_of.get(k["duplicate_of"])
-        checks.append(Check(1, "duplicate", target is not None and f"#{target}" in text, f"key: #{target}"))
+        named = [b.get("duplicate_of") for b in result_blocks(text) if b.get("duplicate_of") is not None]
+        ok = target is not None and (str(named[-1]).lstrip("#") == str(target) if named else f"#{target}" in text)
+        checks.append(Check(1, "duplicate", ok, f"{'#' + str(named[-1]).lstrip('#') if named else 'from text'} "
+                                                f"(key: #{target})"))
     cites = citations(text)
     targets = [k["culprit"]] if k.get("culprit") else []
     if k.get("related") and not k["related"]["path"].startswith(f"{APP}/docs/"):
@@ -271,7 +314,8 @@ def score_l1(tid: str, k: dict[str, Any], act: IssueActivity | None, prs: list[d
     checks.append(Check(1, "grounded", not invented if cites else None, ", ".join(invented)))
     if k.get("owner"):
         owner = k["owner"].removeprefix("@harbor-mutual/")
-        named = teams_named(text, teams)
+        owners = [str(b["owner"]) for b in result_blocks(text) if b.get("owner")]
+        named = teams_named(owners[-1], teams) if owners else teams_named(RESULT_BLOCK.sub("", text), teams)
         checks.append(Check(1, "owner", bool(named) and named[0] == owner, f"{named[0] if named else 'none'} "
                                                                              f"(key: {owner})"))
     else:
@@ -451,6 +495,8 @@ def main() -> int:
     parser.add_argument("--since", help="ISO time the run started (default: rca-lab/runs/baseline.json)")
     parser.add_argument("--baseline", type=Path, default=RUNS / "baseline.json")
     parser.add_argument("--agent-login", help="count only this GitHub account's activity")
+    parser.add_argument("--comment-marker", help="count only comments containing this text (e.g. the agent's "
+                                                 "<!-- marker -->), for an agent posting from a shared account")
     parser.add_argument("--key", type=Path, action="append",
                         help="answer key (repeatable; default: both keys in rca-lab/private/)")
     parser.add_argument("--only", help="comma-separated ticket ids")
@@ -467,7 +513,7 @@ def main() -> int:
         sys.exit("no baseline: run reset.py (or pass --since)")
     subprocess.run(["git", "fetch", "-q", "--prune", "origin"], cwd=REPO_ROOT, check=True)
     repo = args.repo or gh("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
-    run = collect(repo, since, args.agent_login, baseline)
+    run = collect(repo, since, args.agent_login, baseline, args.comment_marker)
     return report(run, tickets, private, canaries, args.level, set(args.only.split(",")) if args.only else None)
 
 
