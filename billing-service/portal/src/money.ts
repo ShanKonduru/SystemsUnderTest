@@ -6,11 +6,16 @@ const SYMBOLS: Record<string, string> = { USD: "$" };
 export function formatMoney(amount: string | number, currency = "USD"): string {
   const cents = toCents(amount);
   const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  const dollars = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const fraction = (abs % 100).toString().padStart(2, "0");
+  const { dollars, fraction } = splitCents(Math.abs(cents));
   const symbol = SYMBOLS[currency];
   return symbol ? `${sign}${symbol}${dollars}.${fraction}` : `${sign}${dollars}.${fraction} ${currency}`;
+}
+
+/** 123456 -> { dollars: "1,234", fraction: "56" }, for a non-negative number of cents. */
+export function splitCents(cents: number): { dollars: string; fraction: string } {
+  const dollars = Math.floor(cents / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fraction = (cents % 100).toString().padEnd(2, "0");
+  return { dollars, fraction };
 }
 
 /** Whole cents, without going through binary floating point for strings. */
