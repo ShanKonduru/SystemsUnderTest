@@ -1,6 +1,6 @@
 [project]
 name = "harbor-billing-service"
-version = "1.1.0"
+version = "1.2.0"
 description = "Harbor Mutual billing service: premiums, installment schedules, payments, renewals and refunds."
 requires-python = ">=3.11"
 dependencies = [

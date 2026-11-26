@@ -2,6 +2,15 @@
 
 Releases are tagged `billing-service-v<version>`; the running version is in `GET /health`.
 
+## 1.2.0
+
+- Quotes itemise the multi-policy and paperless discounts.
+- Multi-policy discount: 12% loyalty tier from four active policies (BR-03).
+- 2027 Massachusetts rates.
+- `GET /calendar/holidays` for the ops team; holidaycal updated to 1.3.0.
+- Portal: dates formatted with `Intl.DateTimeFormat`; a `splitCents` helper for money display.
+- The policy's `next_payment` late fee comes from `payments.late_fee_on`.
+
 ## 1.1.0
 
 - Payment reminders: `GET /policies/{id}/reminders` (BR-15), lead time configurable as `reminder_days`.
