@@ -24,6 +24,7 @@ class Settings:
     grace_days: int
     free_look_days: int
     renewal_notice_days: int
+    reminder_days: int
     late_fee: Decimal
     cancellation_fee: Decimal
     installment_fees: Mapping[str, Decimal]
@@ -52,6 +53,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         grace_days=int(raw["grace_days"]),
         free_look_days=int(raw["free_look_days"]),
         renewal_notice_days=int(raw["renewal_notice_days"]),
+        reminder_days=int(raw["reminder_days"]),
         late_fee=Decimal(str(fees["late"])),
         cancellation_fee=Decimal(str(fees["cancellation"])),
         installment_fees={plan: Decimal(str(fee)) for plan, fee in fees["installment"].items()},

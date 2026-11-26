@@ -39,8 +39,8 @@ def test_add_months_keeps_the_day_and_clamps_to_month_end(anchor: date, months: 
 
 def test_settings_from_yaml_and_environment(tmp_path: Path) -> None:
     s = load_settings({})
-    assert (s.currency, s.timezone, s.grace_days, s.free_look_days, s.renewal_notice_days) == (
-        "USD", "America/New_York", 10, 10, 45)
+    assert (s.currency, s.timezone, s.grace_days, s.free_look_days, s.renewal_notice_days, s.reminder_days) == (
+        "USD", "America/New_York", 5, 10, 45, 7)
     assert (s.late_fee, s.cancellation_fee) == (Decimal("10.00"), Decimal("25.00"))
     assert s.installment_fees == {"annual": Decimal("0.00"), "semiannual": Decimal("0.00"),
                                   "quarterly": Decimal("2.00"), "monthly": Decimal("3.00")}

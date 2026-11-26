@@ -3,9 +3,10 @@
 # environment variables, see README.md.
 currency: USD
 timezone: America/New_York   # the billing day, BR-10
-grace_days: 10               # BR-08
+grace_days: 5                # BR-08
 free_look_days: 10           # RF-02
 renewal_notice_days: 45      # BR-14
+reminder_days: 7             # BR-15
 fees:
   late: "10.00"              # BR-11
   cancellation: "25.00"      # RF-04

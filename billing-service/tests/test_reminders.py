@@ -20,6 +20,11 @@ def test_reminder_a_week_before(due: date, expected: date) -> None:
     assert reminder_date(due) == expected
 
 
+def test_reminder_lead_time_is_configurable() -> None:
+    assert reminder_date(date(2026, 11, 30), 10) == date(2026, 11, 20)
+    assert reminder_date(date(2026, 12, 3), 3) == date(2026, 11, 30)
+
+
 def test_reminders_for_unpaid_installments(client: TestClient) -> None:
     body = client.get("/policies/P-5001/reminders").json()
     assert body == {"policy_id": "P-5001", "reminders": [

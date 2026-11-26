@@ -148,7 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for row in store.installments(policy_id):
                 if row["paid_on"] is not None:
                     continue
-                remind_on = reminder_date(date.fromisoformat(row["due_date"]))
+                remind_on = reminder_date(date.fromisoformat(row["due_date"]), settings.reminder_days)
                 result.append({
                     "installment": row["number"], "due_date": row["due_date"], "remind_on": remind_on.isoformat(),
                     "status": "sent" if remind_on <= settings.today else "scheduled",

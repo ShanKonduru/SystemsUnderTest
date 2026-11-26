@@ -66,8 +66,8 @@ def test_seeded_policies(client: TestClient, policy_id: str, premium: str, statu
 def test_policy_standing_details(client: TestClient) -> None:
     lapsed = client.get("/policies/P-5004").json()
     assert lapsed["renewal_date"] == "2027-08-20"
-    assert lapsed["standing"] == {"installment": 3, "due_date": "2026-10-20", "grace_ends": "2026-10-30",
-                                  "lapse_date": "2026-10-31"}
+    assert lapsed["standing"] == {"installment": 3, "due_date": "2026-10-20", "grace_ends": "2026-10-25",
+                                  "lapse_date": "2026-10-26"}
     assert lapsed["next_payment"] is None
     assert client.get("/policies/P-9999").status_code == 404
 
