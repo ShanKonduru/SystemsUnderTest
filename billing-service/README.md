@@ -71,6 +71,32 @@ The service reads every setting at start-up. It never uses the machine's timezon
 billing timezone, `BILLING_TIMEZONE` or the config file's. The portal page runs in the member's browser, so a UI test
 should pin the browser's timezone and locale to the member's rather than rely on the test machine's.
 
+### Run it in Docker
+
+From the repository root (the build context is the root, like the other Harbor Mutual apps):
+
+```bat
+docker compose -f billing-service\docker-compose.yml up -d --build
+curl http://127.0.0.1:8500/health
+```
+
+The image builds the portal page itself (a Node stage), so `node` isn't needed on the host. `billing.db` and
+`logs/billing.log` are in `billing-service\data` on the host. The compose file passes `BILLING_TODAY`,
+`BILLING_TIMEZONE` and `BILLING_SANDBOX_TOKEN` through from the environment or the root `.env`, and `BILLING_PORT`
+picks the host port. Stop it with `docker compose -f billing-service\docker-compose.yml down`; delete
+`billing-service\data` for a freshly seeded database.
+
+The same Dockerfile builds any release, including ones tagged before it existed: check the tag out into a worktree
+and use it as the build context.
+
+```bat
+git worktree add ..\billing-1.1.0 billing-service-v1.1.0
+copy .dockerignore ..\billing-1.1.0\
+docker build -f billing-service\Dockerfile -t harbor-mutual/billing-service:1.1.0 ..\billing-1.1.0
+docker run -d --rm -p 127.0.0.1:8501:8500 harbor-mutual/billing-service:1.1.0
+git worktree remove --force ..\billing-1.1.0
+```
+
 ## API
 
 | Method and path | What it does |

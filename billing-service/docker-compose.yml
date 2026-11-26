@@ -1,0 +1,29 @@
+# Harbor Mutual billing service: premiums, installments, payments, renewals, refunds and the member billing page.
+#   docker compose -f billing-service/docker-compose.yml up -d --build
+#   open http://127.0.0.1:8500/portal?policy=P-5001     (API docs at /docs)
+# Settings come from the repo root's .env (BILLING_*); the service needs no LLM.
+name: harbor-billing-service
+
+services:
+  billing-service:
+    build:
+      context: ..
+      dockerfile: billing-service/Dockerfile
+    image: harbor-mutual/billing-service:dev
+    env_file:
+      - path: ${SUT_ENV_FILE:-../.env}
+        format: raw          # values used as written: a $ in a password stays a $
+        required: false
+    environment:
+      BILLING_DATA: /app/data
+      # Fixed "today" so standings, reminders and refunds are reproducible between runs.
+      BILLING_TODAY: ${BILLING_TODAY:-2026-11-03}
+      # Overrides the billing timezone in config/billing.yaml; empty keeps the config's.
+      BILLING_TIMEZONE: ${BILLING_TIMEZONE:-}
+      # Test-control endpoints (/sandbox/status, /sandbox/reset) need this token; empty refuses both.
+      BILLING_SANDBOX_TOKEN: ${BILLING_SANDBOX_TOKEN:-}
+    ports:
+      - "127.0.0.1:${BILLING_PORT:-8500}:8500"   # localhost only
+    volumes:
+      - ${BILLING_DATA_DIR:-./data}:/app/data     # billing.db and logs/billing.log, readable from the host
+    restart: unless-stopped
