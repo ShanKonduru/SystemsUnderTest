@@ -14,6 +14,7 @@ the agent did against that answer key.
 |---|---|---|
 | `tickets/*.md` | The ticket texts, filed as GitHub issues labelled `rca-lab`. The front matter holds `order`, `title` and `labels`; the body is the issue text | yes |
 | `selfcheck.py` | Proves the answer key against the billing service's tagged history | yes |
+| `file_tickets.py` | Files the tickets as GitHub issues (dry run unless `--file`), skipping any already filed | yes |
 | `security_audit.py` | Dependency security audit of any revision with the `sec-utils` scanners, as one HTML report | yes |
 | `private/` | The answer keys (`answer-key.yaml`; `security-key.yaml` for the security tickets), the hidden tests and the reference fixes | **never** (git-ignored) |
 | `audit-reports/` | Output of `security_audit.py` | no (git-ignored) |
@@ -74,7 +75,19 @@ clean, 1 means vulnerabilities were found, and 2 means a scanner could not run.
 To check the security answer key, run the self-check with `--key` pointing at `security-key.yaml`. Use an absolute
 path, because the patches are resolved from inside a worktree.
 
+## Filing the tickets
+
+```bat
+python rca-lab\file_tickets.py           :: dry run: each ticket, and the issue number if it is filed already
+python rca-lab\file_tickets.py --file    :: file the rest, in `order`
+```
+
+Each ticket becomes one issue, with its title and labels taken from the front matter. Any block that starts with
+`<!-- rca-lab:comment -->` is posted as a separate comment after the issue is created. A ticket whose title already
+matches an `rca-lab` issue is skipped, so a run that stops part-way can be repeated. All 19 tickets are filed on this
+repository as issues #1-#19.
+
 ## Not built yet
 
-These come next in the design's build order: `file_tickets.py` (files the tickets as GitHub issues, dry run first),
-`reset.py` (touches only `rca-lab` issues and `rca/*` branches) and `score.py`.
+These come next in the design's build order: `reset.py` (touches only `rca-lab` issues and `rca/*` branches) and
+`score.py`.
