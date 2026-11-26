@@ -224,7 +224,7 @@ jobs:
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           TAG="sha-${GITHUB_SHA::7}"
-          for app in claims-agent:harbor-claims-agent expense-agent:harbor-expense-agent multi-agent-desk:harbor-member-desk chat-assistant:harbor-chat-assistant automation-lab:harbor-automation-lab; do
+          for app in claims-agent:harbor-claims-agent expense-agent:harbor-expense-agent multi-agent-desk:harbor-member-desk chat-assistant:harbor-chat-assistant automation-lab:harbor-automation-lab billing-service:harbor-billing-service; do
             dir="${app%%:*}"; name="${app##*:}"; ref="ghcr.io/$OWNER/$name"
             docker build -f "$dir/Dockerfile" \
               --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
