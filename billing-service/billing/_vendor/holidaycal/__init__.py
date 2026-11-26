@@ -10,26 +10,36 @@ A holiday on a Saturday is observed on the Friday before; on a Sunday, on the Mo
 """
 import datetime as _dt
 
-__version__ = "1.2.0"
-__all__ = ["holidays", "is_holiday", "is_business_day", "next_business_day", "previous_business_day"]
+__version__ = "1.3.0"
+__all__ = [
+    "holidays", "is_holiday", "is_weekend", "is_business_day", "next_business_day", "previous_business_day",
+]
 
 _MON, _THU, _SAT, _SUN = 0, 3, 5, 6
 
 
+# Floating holidays: (name, month, weekday, n), the n-th weekday of the month; n = -1 is the last one.
+_FLOATING = (
+    ("Birthday of Martin Luther King, Jr.", 1, _MON, 3),
+    ("Washington's Birthday", 2, _MON, 3),
+    ("Memorial Day", 5, _MON, -1),
+    ("Labor Day", 9, _MON, 1),
+    ("Columbus Day", 10, _MON, 2),
+    ("Thanksgiving Day", 11, _THU, -1),
+)
+
+
 def _nth_weekday(year, month, weekday, n):
-    """The n-th `weekday` (0 = Monday) of the month."""
+    """The n-th `weekday` (0 = Monday) of the month; n = -1 for the last one."""
+    if n == -1:
+        if month == 12:
+            last = _dt.date(year, 12, 31)
+        else:
+            last = _dt.date(year, month + 1, 1) - _dt.timedelta(days=1)
+        return last - _dt.timedelta(days=(last.weekday() - weekday) % 7)
     first = _dt.date(year, month, 1)
     offset = (weekday - first.weekday()) % 7
     return first + _dt.timedelta(days=offset + 7 * (n - 1))
-
-
-def _last_weekday(year, month, weekday):
-    """The last `weekday` (0 = Monday) of the month."""
-    if month == 12:
-        last = _dt.date(year, 12, 31)
-    else:
-        last = _dt.date(year, month + 1, 1) - _dt.timedelta(days=1)
-    return last - _dt.timedelta(days=(last.weekday() - weekday) % 7)
 
 
 def _observed(day):
@@ -48,14 +58,7 @@ def holidays(year):
         "Veterans Day": _dt.date(year, 11, 11),
         "Christmas Day": _dt.date(year, 12, 25),
     }
-    floating = {
-        "Birthday of Martin Luther King, Jr.": _nth_weekday(year, 1, _MON, 3),
-        "Washington's Birthday": _nth_weekday(year, 2, _MON, 3),
-        "Memorial Day": _last_weekday(year, 5, _MON),
-        "Labor Day": _nth_weekday(year, 9, _MON, 1),
-        "Columbus Day": _nth_weekday(year, 10, _MON, 2),
-        "Thanksgiving Day": _nth_weekday(year, 11, _THU, 4),
-    }
+    floating = {name: _nth_weekday(year, month, weekday, n) for name, month, weekday, n in _FLOATING}
     if year >= 2021:
         fixed["Juneteenth National Independence Day"] = _dt.date(year, 6, 19)
     result = {_observed(day): name for name, day in fixed.items()}
@@ -68,8 +71,12 @@ def is_holiday(day):
     return day in holidays(day.year) or day in holidays(day.year + 1)
 
 
+def is_weekend(day):
+    return day.weekday() >= _SAT
+
+
 def is_business_day(day):
-    return day.weekday() < _SAT and not is_holiday(day)
+    return not is_weekend(day) and not is_holiday(day)
 
 
 def next_business_day(day):

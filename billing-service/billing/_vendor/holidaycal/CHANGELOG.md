@@ -1,5 +1,10 @@
 # holidaycal changelog
 
+## 1.3.0 (2026-08-03)
+- `is_weekend`.
+- Floating holidays are defined in one table, `_FLOATING`; `_nth_weekday` takes n = -1 for the last weekday of the
+  month, replacing `_last_weekday`.
+
 ## 1.2.0 (2025-09-14)
 - `next_business_day` and `previous_business_day`.
 
