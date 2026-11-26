@@ -1,6 +1,6 @@
 {
   "name": "@harbor-mutual/portal",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Member-portal formatting and validation, and the billing page the billing service serves at /portal.",
   "type": "module",

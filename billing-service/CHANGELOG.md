@@ -2,6 +2,14 @@
 
 Releases are tagged `billing-service-v<version>`; the running version is in `GET /health`.
 
+## 1.3.0
+
+- Renewal notice letters: `GET /policies/{id}/renewal-notice` (BR-17), rendered from HTML templates.
+- Reminder delivery: `POST /reminders/send` hands the day's reminders to the notification gateway (BR-18),
+  configured with `BILLING_NOTIFY_URL`.
+- Payment receipts: every payment answers with a signed `receipt`; `GET /receipts/{receipt}` checks one (BR-19).
+  The signing key is `BILLING_RECEIPT_KEY`.
+
 ## 1.2.0
 
 - Quotes itemise the multi-policy and paperless discounts.

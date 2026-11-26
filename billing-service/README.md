@@ -63,11 +63,11 @@ tag and start the service as above with a fresh `BILLING_DATA` directory, so the
 version's code:
 
 ```bat
-git checkout billing-service-v1.2.0
-set BILLING_DATA=%TEMP%\billing-1.2.0
+git checkout billing-service-v1.3.0
+set BILLING_DATA=%TEMP%\billing-1.3.0
 node portal\build.mjs
 .venv\Scripts\python -m billing
-curl http://127.0.0.1:8500/health      :: {"status": "ok", "version": "1.2.0", "today": "2026-11-03"}
+curl http://127.0.0.1:8500/health      :: {"status": "ok", "version": "1.3.0", "today": "2026-11-03"}
 ```
 
 The service reads every setting at start-up. It never uses the machine's timezone (`TZ`): payments are dated in the
