@@ -47,7 +47,7 @@ py -3.12 -m venv .venv
 | `automation-lab` | `ruff check automation_lab tests` | `python -m pytest -q --cov` (install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm`) |
 | `policy-desk` | `app\build.bat` (csc, `/warnaserror+`); `ruff check screens tests tools` for the suite | `app\bin\policydesk-cli.exe --self-test`. Local only (needs a desktop): `python -m pytest` (baseline suite; install `-r requirements-test.txt`), `python tools\defect_matrix.py`, `tools\smoke.bat` |
 | `billing-service` | `ruff check billing tests` (`billing/_vendor` excluded) | `python -m pytest -q --cov`; portal: `cd portal && npm test` (`node --test` on the `.ts` sources, Node 24+, no packages; `node build.mjs` builds `dist/` for `/portal`). Install: `-r requirements.txt pytest pytest-cov httpx ruff`, no `harbor_llm` |
-| `rca-lab` | — | `billing-service\.venv\Scripts\python rca-lab\selfcheck.py` (needs the private answer key; `--only T01,T02`, `--no-suite`) |
+| `rca-lab` | — | `billing-service\.venv\Scripts\python rca-lab\selfcheck.py` (needs the private answer key; `--only T01,T02`, `--no-suite`; `--key <absolute path>\security-key.yaml` for the security tickets). `python rca-lab\security_audit.py [--ref <ref>]`: dependency audit with the sibling `sec-utils` bundle (trivy offline, pip-audit, `srk` HTML report); exit 0 = clean |
 
 Single test: `python -m pytest tests/test_engine.py::test_name -q`. All tests are offline (scripted LLM, no keys);
 pytest uses `asyncio_mode = "auto"`, so async tests need no decorator.
@@ -133,8 +133,9 @@ portal's money/date formatting and billing page in TypeScript under `portal/`. B
 `docs/specs/` (BR-xx, RF-xx, PD-xx); owners are in `CODEOWNERS`. `BILLING_TODAY` (default `2026-11-03`) and
 `BILLING_SANDBOX_TOKEN` work like the other apps'; payments are dated in the billing timezone, never the machine's `TZ`.
 Unlike the other apps its defects are **not** env-flag switches: they were slipped into ordinary feature commits
-between the release tags `billing-service-v1.0.0` (clean) → `v1.1.0` → `v1.2.0`, so the RCA agent can find them with
-`git log`/`blame`. Hence:
+between the release tags `billing-service-v1.0.0` (clean) → `v1.1.0` → `v1.2.0` → `v1.3.0`, so the RCA agent can find them
+with `git log`/`blame`. `rca-lab/security_audit.py` is the dependency audit the `security` tickets are accepted against.
+Hence:
 - `main`'s history is append-only (never rewrite, rebase or force-push), and don't "fix" a planted defect, add a test
   that catches one, or describe one in a commit message, comment or doc. The shipped suite and CI stay green with the
   defects in place. A new release needs a version bump (`pyproject.toml`, `CHANGELOG.md`) and a

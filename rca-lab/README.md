@@ -14,7 +14,9 @@ the agent did against that answer key.
 |---|---|---|
 | `tickets/*.md` | The ticket texts, filed as GitHub issues labelled `rca-lab`. The front matter holds `order`, `title` and `labels`; the body is the issue text | yes |
 | `selfcheck.py` | Proves the answer key against the billing service's tagged history | yes |
-| `private/` | The answer key (`answer-key.yaml`), the hidden tests and the reference fixes | **never** (git-ignored) |
+| `security_audit.py` | Dependency security audit of any revision with the `sec-utils` scanners, as one HTML report | yes |
+| `private/` | The answer keys (`answer-key.yaml`; `security-key.yaml` for the security tickets), the hidden tests and the reference fixes | **never** (git-ignored) |
+| `audit-reports/` | Output of `security_audit.py` | no (git-ignored) |
 
 The tickets are written as members and staff would write them, so they don't name a cause. Some are vague on
 purpose.
@@ -50,6 +52,27 @@ ticket it checks that:
 5. for a regression, the hidden test passes at the version that worked.
 
 `--key PATH` picks another key. The hidden tests and fixes are resolved next to the key.
+
+## Security tickets and the audit
+
+The tickets labelled `security` are findings from an external assessment of billing service 1.3.0. For these, a
+fix is accepted when the hidden tests pass, the shipped suite stays green, and the dependency audit of the fix is
+clean:
+
+```bat
+python rca-lab\security_audit.py --ref billing-service-v1.3.0   :: the reported version: findings, exit 1
+python rca-lab\security_audit.py --ref rca/<fix-branch>         :: the agent's fix: "clean", exit 0
+python rca-lab\security_audit.py                                :: the working tree
+python rca-lab\security_audit.py --offline                      :: trivy only, no network
+```
+
+The audit uses the scanners in the `sec-utils` bundle (`--sec-utils`, else `SEC_UTILS`, else a `sec-utils` folder
+next to this repository). trivy runs offline with the bundle's vulnerability database. pip-audit needs PyPI and OSV.
+`srk render consolidated` writes one HTML report. Results go to `rca-lab/audit-reports/<ref>/`. Exit code 0 means
+clean, 1 means vulnerabilities were found, and 2 means a scanner could not run.
+
+To check the security answer key, run the self-check with `--key` pointing at `security-key.yaml`. Use an absolute
+path, because the patches are resolved from inside a worktree.
 
 ## Not built yet
 

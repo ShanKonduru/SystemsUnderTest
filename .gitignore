@@ -226,3 +226,5 @@ __marimo__/
 
 # The RCA lab answer key and hidden tests: never committed (the repo is public and the agent reads it)
 rca-lab/private/
+# Results of rca-lab/security_audit.py
+rca-lab/audit-reports/
