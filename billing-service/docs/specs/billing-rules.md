@@ -68,6 +68,10 @@ a **$10.00 late fee**. Partial and over-payments are refused.
 **BR-12 Lapsed policies.** A payment received after the grace period has ended is refused: the policy has lapsed and
 needs reinstatement, which is handled outside this service.
 
+**BR-15 Payment reminders.** A reminder is sent **7 days** before each unpaid installment's due date: an
+installment due November 30 is reminded on November 23, one due March 3 on February 24, one due January 1 on
+December 25 of the year before. Paid installments and cancelled policies get no reminders.
+
 ## Renewals
 
 **BR-09 Term.** A policy runs 12 months: it renews on the same day of the month as its effective date, a year later

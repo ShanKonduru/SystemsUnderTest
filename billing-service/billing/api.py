@@ -22,6 +22,7 @@ from .payments import assess_payment, received_date
 from .premiums import quote_premium
 from .rates import load_rates
 from .refunds import RefundQuote, refund_quote
+from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
 from .store import Store
 
@@ -135,6 +136,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for row in rows:
             row["total"] = fmt(Decimal(row["amount"]) + Decimal(row["fee"]))
         return {"policy_id": policy_id, "plan": p["plan"], "installments": rows}
+
+    @app.get("/policies/{policy_id}/reminders")
+    def reminders(policy_id: str) -> dict[str, Any]:
+        p = store.policy(policy_id)
+        result = []
+        if p["cancelled_on"] is None:
+            for row in store.installments(policy_id):
+                if row["paid_on"] is not None:
+                    continue
+                remind_on = reminder_date(date.fromisoformat(row["due_date"]))
+                result.append({
+                    "installment": row["number"], "due_date": row["due_date"], "remind_on": remind_on.isoformat(),
+                    "status": "sent" if remind_on <= settings.today else "scheduled",
+                })
+        return {"policy_id": policy_id, "reminders": result}
 
     @app.post("/policies/{policy_id}/payments")
     def pay(policy_id: str, body: PaymentRequest) -> dict[str, Any]:

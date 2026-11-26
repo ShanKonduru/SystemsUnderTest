@@ -20,6 +20,7 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 | `billing/premiums.py` | Quotes: base rate x coverage x driver age, multi-policy and paperless discounts, half-up rounding |
 | `billing/installments.py`, `billing/dates.py` | Installment plans, amounts and due dates |
 | `billing/payments.py` | The billing day (Eastern time), exact amounts, late fees |
+| `billing/reminders.py` | Payment reminder dates |
 | `billing/renewals.py` | Standing (active / past due / lapsed), renewal dates, renewal notice dates |
 | `billing/refunds.py` | Free-look and pro-rata refunds |
 | `billing/rates.py`, `reference/rate_tables.csv` | The rate table |
@@ -61,6 +62,7 @@ node portal\build.mjs                 :: builds portal\dist for the /portal page
 | `GET /policies/{id}` | Policy, renewal date, status, standing (installment, due date, grace end, lapse date) and `next_payment`: what a payment made today must be, late fee included |
 | `GET /policies/{id}/schedule` | Installments: due date, amount, fee, total, paid on, late fee |
 | `POST /policies/{id}/payments` | `{amount, received_at}` (ISO 8601 with offset) → pays the earliest unpaid installment |
+| `GET /policies/{id}/reminders` | Payment reminders for the unpaid installments: remind on, sent or scheduled |
 | `GET /policies/{id}/renewal` | Renewal date, notice date, eligibility, renewal premium |
 | `GET /policies/{id}/refund-quote?cancel_date=` | What a cancellation on that date would refund |
 | `POST /policies/{id}/cancel` | `{cancel_date}` → cancels and records the refund |
