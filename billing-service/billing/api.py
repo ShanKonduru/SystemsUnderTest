@@ -27,6 +27,7 @@ from .payments import assess_payment, late_fee_on, received_date
 from .premiums import quote_premium
 from .rates import UnknownTerritory, load_rates
 from .refunds import RefundQuote, premium_paid, refund_quote
+from .reinstatement import Reinstatement, reinstatement_terms
 from .reminders import reminder_date
 from .renewals import Standing, notice_date, renewal_date, standing
 from .store import Store
@@ -46,6 +47,11 @@ class QuoteRequest(BaseModel):
 
 
 class PaymentRequest(BaseModel):
+    amount: Decimal
+    received_at: datetime
+
+
+class ReinstateRequest(BaseModel):
     amount: Decimal
     received_at: datetime
 
@@ -234,6 +240,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log.info("returned payment policy=%s installment=%s fee=%s", policy_id, number, fmt(fee))
         return {"policy_id": policy_id, "installment": number, "returned_payment_fee": fmt(settings.returned_payment_fee),
                 "fee": fmt(fee), "amount_due": fmt(Decimal(rows[number]["amount"]) + fee)}
+
+    def _reinstatement(p: dict[str, Any], day: date) -> Reinstatement:
+        unpaid = [store.as_installment(r) for r in store.installments(p["id"]) if r["paid_on"] is None]
+        return reinstatement_terms(_standing(store, settings, p), unpaid, day, settings.reinstatement_days,
+                                   settings.reinstatement_fee)
+
+    def _reinstatement_json(policy_id: str, r: Reinstatement) -> dict[str, Any]:
+        return {"policy_id": policy_id, "lapse_date": r.lapse_date.isoformat(), "last_day": r.last_day.isoformat(),
+                "installments": r.installments, "reinstatement_fee": fmt(r.fee), "amount_due": fmt(r.amount_due)}
+
+    @app.get("/policies/{policy_id}/reinstatement")
+    def reinstatement(policy_id: str) -> dict[str, Any]:
+        """What reinstating a lapsed policy today takes (BR-22)."""
+        return _reinstatement_json(policy_id, _reinstatement(store.policy(policy_id), settings.today))
+
+    @app.post("/policies/{policy_id}/reinstate")
+    def reinstate(policy_id: str, body: ReinstateRequest) -> dict[str, Any]:
+        """Reinstates a lapsed policy with one payment of everything due plus the reinstatement fee (BR-22)."""
+        p = store.policy(policy_id)
+        received_on = received_date(body.received_at, settings.timezone)
+        terms = _reinstatement(p, received_on)
+        if body.amount != terms.amount_due:
+            raise BillingError(f"reinstating policy {policy_id} needs exactly {terms.amount_due}, including the "
+                               f"{terms.fee} reinstatement fee; received {body.amount}")
+        rows = {r["number"]: r for r in store.installments(policy_id)}
+        for number in terms.installments:
+            inst = store.as_installment(rows[number])
+            store.record_payment(policy_id, number, received_on, inst.total, Decimal("0.00"))
+        log.info("reinstated policy=%s received_on=%s installments=%s amount=%s", policy_id, received_on,
+                 terms.installments, fmt(terms.amount_due))
+        return {**_reinstatement_json(policy_id, terms), "received_on": received_on.isoformat(),
+                "status": _standing(store, settings, store.policy(policy_id)).status}
 
     @app.get("/receipts/{token}")
     def receipt(token: str) -> dict[str, Any]:

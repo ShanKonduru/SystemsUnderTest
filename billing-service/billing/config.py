@@ -25,9 +25,11 @@ class Settings:
     free_look_days: int
     renewal_notice_days: int
     reminder_days: int
+    reinstatement_days: int
     late_fee: Decimal
     cancellation_fee: Decimal
     returned_payment_fee: Decimal
+    reinstatement_fee: Decimal
     installment_fees: Mapping[str, Decimal]
     today: date
     data_dir: Path
@@ -57,9 +59,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         free_look_days=int(raw["free_look_days"]),
         renewal_notice_days=int(raw["renewal_notice_days"]),
         reminder_days=int(raw["reminder_days"]),
+        reinstatement_days=int(raw["reinstatement_days"]),
         late_fee=Decimal(str(fees["late"])),
         cancellation_fee=Decimal(str(fees["cancellation"])),
         returned_payment_fee=Decimal(str(fees["returned_payment"])),
+        reinstatement_fee=Decimal(str(fees["reinstatement"])),
         installment_fees={plan: Decimal(str(fee)) for plan, fee in fees["installment"].items()},
         today=date.fromisoformat(env.get("BILLING_TODAY") or DEFAULT_TODAY),
         data_dir=Path(env.get("BILLING_DATA") or SERVICE_ROOT / "data"),

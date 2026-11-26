@@ -76,7 +76,13 @@ A payment received at 10:00 pm Eastern on the due date is on time, even though i
 a **$10.00 late fee**. Partial and over-payments are refused.
 
 **BR-12 Lapsed policies.** A payment received after the grace period has ended is refused: the policy has lapsed and
-needs reinstatement, which is handled outside this service.
+needs reinstatement (BR-22).
+
+**BR-22 Reinstatement.** A lapsed policy can be reinstated up to and including the **30th day after its lapse date**.
+The member pays, in one payment of exactly that amount, every unpaid installment due by the day of the payment
+(amount plus installment fee, no late fees) and a **$50.00 reinstatement fee**. Those installments count as paid on
+that day and the policy is active again. A policy that lapsed October 31 can be reinstated through November 30.
+After that it can't be reinstated, and the member needs a new policy.
 
 **BR-21 Returned payments.** When the bank returns a payment (insufficient funds, a closed account, a chargeback),
 the payment is reversed: that installment is unpaid again, as if it had never been paid, and a **$15.00

@@ -9,6 +9,7 @@
 /billing-service/billing/renewals.py        @harbor-mutual/policy-servicing
 /billing-service/billing/refunds.py         @harbor-mutual/policy-servicing
 /billing-service/billing/endorsements.py    @harbor-mutual/policy-servicing
+/billing-service/billing/reinstatement.py   @harbor-mutual/policy-servicing
 
 /billing-service/billing/_vendor/           @harbor-mutual/platform
 /billing-service/THIRD_PARTY.md             @harbor-mutual/platform
