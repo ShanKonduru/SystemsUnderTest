@@ -30,6 +30,7 @@ Paid installments show `Paid <date>`.
 | Amount | dollars and cents, up to 2 decimals | Enter the amount as dollars and cents, like 120.50. |
 | Amount | exactly the installment total due (BR-11) | The amount must be exactly the amount due, `<amount>`. |
 | Card number | 13-19 digits (spaces and dashes allowed), passes the Luhn check | Enter a valid card number. |
+| Security code | 4 digits for American Express (card numbers starting 34 or 37), 3 digits for every other card | Enter the 4-digit security code. / Enter the 3-digit security code. |
 | Expiry month | 1 to 12 | Enter the expiry month as 1 to 12. |
 | Expiry | a card is valid through the last day of its expiry month | This card has expired. |
 | ZIP code | 5 digits | Enter a 5-digit ZIP code. |

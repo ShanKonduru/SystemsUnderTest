@@ -6,6 +6,7 @@ export interface PaymentForm {
   amount: string;
   amountDue: string;
   cardNumber: string;
+  cvv: string;
   expMonth: number;
   expYear: number;
   zip: string;
@@ -24,6 +25,11 @@ export function validatePayment(form: PaymentForm, todayIso: string): string[] {
   }
   const digits = form.cardNumber.replace(/[\s-]/g, "");
   if (!/^\d{13,19}$/.test(digits) || !luhnValid(digits)) errors.push("Enter a valid card number.");
+  const codeLength = securityCodeLength(digits);
+  const code = form.cvv.trim();
+  if (!/^\d+$/.test(code) || code.length !== codeLength) {
+    errors.push(`Enter the ${codeLength}-digit security code.`);
+  }
   if (!Number.isInteger(form.expMonth) || form.expMonth < 1 || form.expMonth > 12) {
     errors.push("Enter the expiry month as 1 to 12.");
   } else if (isExpired(form.expMonth, form.expYear, todayIso)) {
@@ -31,6 +37,11 @@ export function validatePayment(form: PaymentForm, todayIso: string): string[] {
   }
   if (!/^\d{5}$/.test(form.zip)) errors.push("Enter a 5-digit ZIP code.");
   return errors;
+}
+
+/** American Express cards have a 4-digit security code on the front; other cards 3 digits on the back. */
+export function securityCodeLength(cardDigits: string): number {
+  return cardDigits.startsWith("34" || "37") ? 4 : 3;
 }
 
 /** A card is valid through the last day of its expiry month. */

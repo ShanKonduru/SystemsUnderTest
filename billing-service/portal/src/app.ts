@@ -79,6 +79,7 @@ async function load(policyId: string): Promise<void> {
       amount: String(data.get("amount") ?? ""),
       amountDue: next.amount_due,
       cardNumber: String(data.get("card") ?? ""),
+      cvv: String(data.get("cvv") ?? ""),
       expMonth: Number(data.get("exp-month")),
       expYear: Number(data.get("exp-year")),
       zip: String(data.get("zip") ?? ""),
