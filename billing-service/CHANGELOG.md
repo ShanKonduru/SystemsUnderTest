@@ -2,6 +2,19 @@
 
 Releases are tagged `billing-service-v<version>`; the running version is in `GET /health`.
 
+## 1.4.0
+
+- Vermont: 2027 rates for auto, home and renters, and the VT premium tax (BR-01, BR-16).
+- Endorsements: `GET /policies/{id}/endorsement-quote?coverage=&on=` quotes a coverage change mid-term (BR-20).
+- Returned payments: `POST /policies/{id}/installments/{n}/return`, with the returned-payment fee (BR-21).
+- Reinstatement: `GET /policies/{id}/reinstatement` and `POST /policies/{id}/reinstate` for a policy that lapsed
+  within the last 30 days (BR-22).
+- Monthly statements: `GET /customers/{id}/statement?month=`, with installment labels ("4th installment"), and the
+  portal's statement page `/portal/statement.html` (BR-23, PD-05). Ordinals vendored at 0.4.1.
+- A bimonthly plan (BR-05, BR-06) and `POST /schedules/preview`.
+- Portal: the payment form asks for the card security code (PD-04).
+- `config/billing.staging.yaml` for the staging cluster.
+
 ## 1.3.0
 
 - Renewal notice letters: `GET /policies/{id}/renewal-notice` (BR-17), rendered from HTML templates.

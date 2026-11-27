@@ -112,16 +112,23 @@ git worktree remove --force ..\billing-1.1.0
 | `GET /customers/{id}` | Customer and their policy ids |
 | `GET /policies/{id}` | Policy, renewal date, status, standing (installment, due date, grace end, lapse date) and `next_payment`: what a payment made today must be, late fee included |
 | `GET /policies/{id}/schedule` | Installments: due date, amount, fee, total, paid on, late fee |
+| `POST /schedules/preview` | `{premium, plan, effective_date}` → the installments that premium would be paid in on that plan |
+| `GET /customers/{id}/statement?month=` | The monthly statement (BR-23): the installments due that month, with their labels, and the amount due |
 | `POST /reminders/send?on=` | Delivers the reminders due on that day (default today) through the notification gateway (BR-18): `{on, sent, failed}` |
 | `POST /policies/{id}/payments` | `{amount, received_at}` (ISO 8601 with offset) → pays the earliest unpaid installment; the answer carries a signed `receipt` (BR-19) |
 | `GET /receipts/{receipt}` | Checks a receipt and returns the payment it records; 422 for one the service didn't issue |
 | `GET /policies/{id}/reminders` | Payment reminders for the unpaid installments: remind on, sent or scheduled |
+| `POST /policies/{id}/installments/{n}/return` | The bank returned that installment's payment: it is unpaid again, with the returned-payment fee (BR-21) |
+| `GET /policies/{id}/reinstatement` | What reinstating a lapsed policy today takes (BR-22) |
+| `POST /policies/{id}/reinstate` | `{amount, received_at}` → reinstates a lapsed policy with one payment |
+| `GET /policies/{id}/endorsement-quote?coverage=&on=` | What a coverage change costs for the rest of the term (BR-20) |
 | `GET /policies/{id}/renewal` | Renewal date, notice date, eligibility, renewal premium |
 | `GET /policies/{id}/renewal-notice` | The renewal notice letter as an HTML page (BR-17); 409 when the policy isn't offered a renewal |
 | `GET /policies/{id}/refund-quote?cancel_date=` | What a cancellation on that date would refund |
 | `POST /policies/{id}/cancel` | `{cancel_date}` → cancels and records the refund |
 | `GET /calendar/holidays?year=` | The federal holidays (as observed) that renewal notices skip |
 | `GET /portal?policy=P-5001` | The member billing page |
+| `GET /portal/statement.html?customer=C-1001&month=2026-11` | The member statement page |
 
 Money is sent as strings with two decimals. Refused requests answer 4xx with `{error, detail}`. Any other error
 answers 500 with `{error: "internal", request_id}`; the same request id is in the `X-Request-Id` header and, with the

@@ -15,7 +15,7 @@ from tests.conftest import TOKEN
 
 
 def test_health(client: TestClient) -> None:
-    assert client.get("/health").json() == {"status": "ok", "version": "1.3.0", "today": "2026-11-03"}
+    assert client.get("/health").json() == {"status": "ok", "version": "1.4.0", "today": "2026-11-03"}
 
 
 def test_quote(client: TestClient) -> None:
@@ -203,7 +203,7 @@ def test_sandbox_needs_the_token(client: TestClient) -> None:
     assert client.get("/sandbox/status").status_code == 403
     assert client.post("/sandbox/reset", headers={"X-Sandbox-Token": "wrong"}).status_code == 403
     status = client.get("/sandbox/status", headers={"X-Sandbox-Token": TOKEN}).json()
-    assert status == {"today": "2026-11-03", "version": "1.3.0", "customers": 5, "policies": 8, "installments": 35}
+    assert status == {"today": "2026-11-03", "version": "1.4.0", "customers": 5, "policies": 8, "installments": 35}
 
 
 def test_sandbox_is_off_without_a_token(settings: Settings) -> None:
