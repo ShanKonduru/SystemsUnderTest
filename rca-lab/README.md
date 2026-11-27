@@ -92,7 +92,7 @@ python rca-lab\file_tickets.py --file    :: file the rest, in `order`
 Each ticket becomes one issue, with its title and labels taken from the front matter. Any block that starts with
 `<!-- rca-lab:comment -->` is posted as a separate comment after the issue is created. A ticket whose title already
 matches an `rca-lab` issue is skipped, so a run that stops part-way can be repeated. The first 19 tickets are filed
-on this repository as issues #1-#19.
+on this repository as issues #1-#19, the held-out set as #20-#39.
 
 ## Running and scoring an agent
 
