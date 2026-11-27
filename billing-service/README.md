@@ -32,6 +32,7 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 | `billing/_vendor/holidaycal/` | US federal holiday calendar (third-party, pinned) |
 | `billing/_vendor/ordinals/` | English ordinal numbers for statement labels (third-party, pinned) |
 | `config/billing.yaml` | Business settings: timezone, grace days, free-look days, fees |
+| `config/billing.staging.yaml` | The same settings for the staging cluster, with next-day reminders for testers |
 | `portal/src/` | Money and date formatting, payment-form validation, the billing page script |
 | `portal/page/` | The billing page's HTML and CSS |
 

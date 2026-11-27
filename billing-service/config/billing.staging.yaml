@@ -1,0 +1,20 @@
+# Staging settings for billing.yaml's business rules: the same values, except that payment reminders go out the day
+# before an installment is due, so testers can watch a whole reminder cycle in a day. Select it with
+# BILLING_CONFIG=config/billing.staging.yaml on the staging cluster only.
+currency: USD
+timezone: America/New_York   # the billing day, BR-10
+grace_days: 5                # BR-08
+free_look_days: 10           # RF-02
+renewal_notice_days: 45      # BR-14
+reminder_days: 1             # testers see a reminder the day before
+reinstatement_days: 30       # BR-22
+fees:
+  late: "10.00"              # BR-11
+  cancellation: "25.00"      # RF-04
+  returned_payment: "15.00"  # BR-21
+  reinstatement: "5.00"      # BR-22
+  installment:               # BR-06, per installment
+    annual: "0.00"
+    semiannual: "0.00"
+    quarterly: "2.00"
+    monthly: "3.00"
