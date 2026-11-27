@@ -34,3 +34,9 @@ Paid installments show `Paid <date>`.
 | Expiry month | 1 to 12 | Enter the expiry month as 1 to 12. |
 | Expiry | a card is valid through the last day of its expiry month | This card has expired. |
 | ZIP code | 5 digits | Enter a 5-digit ZIP code. |
+
+**PD-05 Statement page.** `/portal/statement.html?customer=<id>&month=<YYYY-MM>` shows the monthly statement
+(BR-23); without a month it shows the month of the service's "today". The heading names the statement's month in
+full: `Statement for November 2026` for `2026-11`. Each line shows the policy, the installment label
+(`11th installment`), the due date (PD-02), the amount (PD-01) and `Paid` or `Unpaid`; below them, the amount due
+(PD-01). A month with nothing due says `Nothing is due this month.`

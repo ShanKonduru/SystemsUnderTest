@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harbor Mutual - My statement</title>
+  <link rel="stylesheet" href="/portal/portal.css">
+  <script type="module" src="/portal/statement-app.js"></script>
+</head>
+<body>
+  <header><h1>Harbor Mutual</h1><p>My statement</p></header>
+  <main>
+    <p id="load-error" role="alert"></p>
+    <section aria-labelledby="statement-heading">
+      <h2 id="statement-heading">Statement for <span id="statement-month"></span></h2>
+      <p id="customer-name"></p>
+      <table>
+        <thead><tr><th>Policy</th><th>Installment</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody id="statement-rows"></tbody>
+      </table>
+      <p id="statement-empty" hidden>Nothing is due this month.</p>
+      <p>Amount due: <strong id="amount-due"></strong></p>
+    </section>
+  </main>
+</body>
+</html>
