@@ -8,7 +8,7 @@ from billing.installments import Installment, build_schedule
 from billing.payments import assess_payment, late_fee_on, received_date
 
 FEES = {"annual": Decimal("0.00"), "semiannual": Decimal("0.00"), "quarterly": Decimal("2.00"),
-        "monthly": Decimal("3.00")}
+        "bimonthly": Decimal("2.50"), "monthly": Decimal("3.00")}
 
 
 def test_monthly_schedule_from_a_month_end() -> None:
@@ -31,6 +31,7 @@ def test_monthly_schedule_from_a_month_end() -> None:
         ("annual", ["2026-04-01"]),
         ("semiannual", ["2026-04-01", "2026-10-01"]),
         ("quarterly", ["2026-04-01", "2026-07-01", "2026-10-01", "2027-01-01"]),
+        ("bimonthly", ["2026-04-01", "2026-06-01", "2026-08-01", "2026-10-01", "2026-12-01", "2027-02-01"]),
     ],
 )
 def test_other_plans(plan: str, due_dates: list[str]) -> None:

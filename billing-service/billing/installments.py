@@ -9,7 +9,7 @@ from .dates import add_months
 from .errors import BillingError
 from .money import from_cents, to_cents
 
-PLANS = {"annual": 1, "semiannual": 2, "quarterly": 4, "monthly": 12}
+PLANS = {"annual": 1, "semiannual": 2, "quarterly": 4, "bimonthly": 6, "monthly": 12}
 
 
 @dataclass(frozen=True)

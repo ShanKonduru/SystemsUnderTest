@@ -90,6 +90,18 @@ def test_schedule(client: TestClient) -> None:
     assert (last["due_date"], last["paid_on"]) == ("2026-12-31", None)
 
 
+def test_schedule_preview(client: TestClient) -> None:
+    body = client.post("/schedules/preview", json={"premium": "1000.01", "plan": "quarterly",
+                                                   "effective_date": "2027-01-15"}).json()
+    assert (body["plan"], body["premium"]) == ("quarterly", "1000.01")
+    assert [(i["number"], i["due_date"], i["amount"], i["fee"], i["total"]) for i in body["installments"]] == [
+        (1, "2027-01-15", "250.01", "2.00", "252.01"), (2, "2027-04-15", "250.00", "2.00", "252.00"),
+        (3, "2027-07-15", "250.00", "2.00", "252.00"), (4, "2027-10-15", "250.00", "2.00", "252.00")]
+    refused = client.post("/schedules/preview", json={"premium": "100", "plan": "weekly",
+                                                      "effective_date": "2027-01-15"})
+    assert refused.status_code == 422
+
+
 def test_payment_on_the_due_date_in_eastern_time(client: TestClient, settings: Settings) -> None:
     r = client.post("/policies/P-5005/payments", json={"amount": "960.04", "received_at": "2026-11-01T22:00:00-05:00"})
     assert r.status_code == 200

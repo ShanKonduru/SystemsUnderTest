@@ -21,6 +21,7 @@ from ._vendor import holidaycal
 from .config import SERVICE_ROOT, Settings, load_settings
 from .endorsements import endorsement_quote
 from .errors import BillingError, Conflict, NotFound
+from .installments import build_schedule
 from .money import fmt
 from .notify import Gateway
 from .payments import assess_payment, late_fee_on, received_date
@@ -59,6 +60,12 @@ class ReinstateRequest(BaseModel):
 
 class CancelRequest(BaseModel):
     cancel_date: date
+
+
+class SchedulePreviewRequest(BaseModel):
+    premium: Decimal
+    plan: str
+    effective_date: date
 
 
 def configure_logging(path: Path) -> None:
@@ -173,6 +180,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for row in rows:
             row["total"] = fmt(Decimal(row["amount"]) + Decimal(row["fee"]))
         return {"policy_id": policy_id, "plan": p["plan"], "installments": rows}
+
+    @app.post("/schedules/preview")
+    def schedule_preview(body: SchedulePreviewRequest) -> dict[str, Any]:
+        """The installments a premium would be paid in on a plan, before the policy is written (BR-05 to BR-07)."""
+        installments = build_schedule(body.premium, body.plan, body.effective_date, settings.installment_fees)
+        return {
+            "plan": body.plan, "premium": fmt(body.premium),
+            "installments": [{"number": i.number, "due_date": i.due_date.isoformat(), "amount": fmt(i.amount),
+                              "fee": fmt(i.fee), "total": fmt(i.total)} for i in installments],
+        }
 
     @app.get("/policies/{policy_id}/reminders")
     def reminders(policy_id: str) -> dict[str, Any]:

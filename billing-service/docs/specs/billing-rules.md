@@ -41,12 +41,12 @@ of the premium (discounts, installments and refunds work on the premium alone).
 
 ## Installments
 
-**BR-05 Plans.** The annual premium is paid in 1 (annual), 2 (semiannual), 4 (quarterly) or 12 (monthly)
-installments. It is split evenly in whole cents; any leftover cents go on the **first** installment, so the
-installments always add up to the premium exactly.
+**BR-05 Plans.** The annual premium is paid in 1 (annual), 2 (semiannual), 4 (quarterly), 6 (bimonthly, from
+1.4.0) or 12 (monthly) installments. It is split evenly in whole cents; any leftover cents go on the **first**
+installment, so the installments always add up to the premium exactly.
 
-**BR-06 Installment fees.** Each installment carries a fee: annual and semiannual none, quarterly $2.00, monthly
-$3.00 (configured in `config/billing.yaml`). Fees are not part of the premium.
+**BR-06 Installment fees.** Each installment carries a fee: annual and semiannual none, quarterly $2.00, bimonthly
+$2.50, monthly $3.00 (configured in `config/billing.yaml`). Fees are not part of the premium.
 
 **BR-07 Due dates.** The first installment is due on the policy's effective date. Each later one is due 12/n months
 after the previous, **on the same day of the month as the effective date**, or on the last day of the month when the
