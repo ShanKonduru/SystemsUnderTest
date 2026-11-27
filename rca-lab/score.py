@@ -18,8 +18,9 @@ Level 1  class: the classification (labels, else a "Classification:" line in a c
          citation: at least one cited file:line is within 3 lines of the culprit;
          grounded: every cited file:line exists at the reported version;
          owner: the first owning team named is the key's;
-         no-fix: tickets that need no code change (T08-T15) get no application-code fix, and those that need no
-                 change at all (environment, duplicate, not a bug, needs more info) get no pull request.
+         no-fix: tickets that need no code change (T08-T15; with a fixed maximum, every class but code_bug) get
+                 no application-code fix, and those that need no change at all (environment, duplicate, not a
+                 bug, needs more info) get no pull request.
 Level 2  repro: the agent's reproduction fails at the reported version and passes with the reference fix. It is
                 the `repro` of its latest result block (type api: a pytest file run against billing-service started
                 at the tag with the repro's env, then with the fix; existing_test: a test of the shipped suite; ui:
@@ -302,15 +303,16 @@ def score_l1(tid: str, k: dict[str, Any], act: IssueActivity | None, prs: list[d
     got = classify(act.labels_added if act else [], text)
     checks.append(Check(1, "class", got == k["class"], f"{got or 'none given'} (key: {k['class']})"))
     if k.get("duplicate_of"):
-        target = issue_of.get(k["duplicate_of"])
+        target = issue_of.get(k["duplicate_of"]) or k.get("duplicate_of_issue")
         named = [b.get("duplicate_of") for b in result_blocks(text) if b.get("duplicate_of") is not None]
         ok = target is not None and (str(named[-1]).lstrip("#") == str(target) if named else f"#{target}" in text)
         checks.append(Check(1, "duplicate", ok, f"{'#' + str(named[-1]).lstrip('#') if named else 'from text'} "
                                                 f"(key: #{target})"))
     cites = citations(text)
+    fixed = bool(k.get("_fixed_maximum"))
     targets = [k["culprit"]] if k.get("culprit") else []
-    if k.get("related") and not k["related"]["path"].startswith(f"{APP}/docs/"):
-        targets.append(k["related"])
+    if k.get("related") and (not k["related"]["path"].startswith(f"{APP}/docs/") or (fixed and not targets)):
+        targets.append(k["related"])  # with a fixed maximum, a not-a-bug ticket's spec line is the evidence
     if targets:
         hit = any(path == c["path"] and start - TOLERANCE <= c["line"] <= end + TOLERANCE
                   for path, start, end in cites for c in targets)
@@ -318,7 +320,11 @@ def score_l1(tid: str, k: dict[str, Any], act: IssueActivity | None, prs: list[d
     else:
         checks.append(Check(1, "citation", None))
     invented = [f"{p}:{s}" for p, s, e in cites if (n := lines_at(k.get("reported_version"), p)) is None or e > n]
-    checks.append(Check(1, "grounded", not invented if cites else None, ", ".join(invented)))
+    if fixed:  # counted on every ticket; no citations fail only where the key has a line to find
+        checks.append(Check(1, "grounded", not invented if cites else not targets,
+                            ", ".join(invented) or ("" if cites or not targets else "no citations")))
+    else:
+        checks.append(Check(1, "grounded", not invented if cites else None, ", ".join(invented)))
     if k.get("owner"):
         owner = k["owner"].removeprefix("@harbor-mutual/")
         owners = [str(b["owner"]) for b in result_blocks(text) if b.get("owner")]
@@ -327,7 +333,11 @@ def score_l1(tid: str, k: dict[str, Any], act: IssueActivity | None, prs: list[d
                                                                              f"(key: {owner})"))
     else:
         checks.append(Check(1, "owner", None))
-    if 8 <= int(tid[1:]) <= 15 and act and act.comments:  # only once the agent has spoken on the ticket
+    if fixed:
+        no_fix = k["class"] != "code_bug"  # every ticket that needs no application-code change, said or silent
+    else:
+        no_fix = 8 <= int(tid[1:]) <= 15 and bool(act and act.comments)  # only once the agent has spoken
+    if no_fix:
         code = [p for pr in prs for p in touches_app_code(pr)]
         if k["class"] in NO_CHANGE:
             checks.append(Check(1, "no-fix", not prs, f"PR #{prs[0]['number']} opened" if prs else ""))
@@ -414,9 +424,14 @@ def serve(ws: Workspace, env: dict[str, str]) -> tuple[subprocess.Popen[bytes], 
 def run_repro(ws: Workspace, repro: dict[str, Any], test_file: Path | None, env: dict[str, str]) -> int:
     """Runs the repro against this checkout: pytest's exit code (0 passed, 1 failed, other = could not run)."""
     pytest = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q"]
-    if repro["type"] == "existing_test":
+    if repro["type"] == "existing_test":  # run twice, so state a test leaves behind counts
         test_id = str(repro.get("test_id") or "").removeprefix(f"{APP}/")
-        return subprocess.run([*pytest, test_id], cwd=ws.app, env={**os.environ, **env}, capture_output=True).returncode
+        for _ in range(2):
+            code = subprocess.run([*pytest, test_id], cwd=ws.app, env={**os.environ, **env},
+                                  capture_output=True).returncode
+            if code:
+                return code
+        return 0
     proc, url = serve(ws, env)
     try:
         return subprocess.run([*pytest, str(test_file)], cwd=test_file.parent, env={
@@ -442,6 +457,8 @@ def comment_repro(k: dict[str, Any], repro: dict[str, Any], private: Path, ws: W
         if repro.get("sha256") and hashlib.sha256(code.encode("utf-8")).hexdigest() != repro["sha256"]:
             return Check(2, "repro", False, "the test source doesn't match its sha256")
         if kind == "ui" and importlib.util.find_spec("playwright") is None:
+            if k.get("_fixed_maximum"):  # the maximum doesn't move: score on a machine with Playwright
+                return Check(2, "repro", False, "ui repro not verified: install Playwright and score again")
             return Check(2, "repro", None, "ui repro not verified: Playwright isn't installed here")
         test_file = Path(tempfile.mkdtemp(prefix="rca-score-repro-")) / "test_agent_repro.py"
         test_file.write_text(code, encoding="utf-8")
@@ -519,7 +536,7 @@ def score_l23(tid: str, k: dict[str, Any], prs: list[dict[str, Any]], private: P
     checks.append(Check(3, "fix", ok, f"hidden test {'passes' if ok else 'fails'} on {head[:7]}"))
     ok, out = selfcheck.shipped_suite(_SelfcheckView(ws.at(head)))
     checks.append(Check(3, "suite", ok, "" if ok else out[-200:]))
-    if k["class"] == "third_party" and int(tid[1:]) >= 17:
+    if k["class"] == "third_party" and 17 <= int(tid[1:]) <= 19:  # the security tickets
         checks.append(audit_check(k, head))
     return checks
 
@@ -606,6 +623,8 @@ def load_keys(paths: list[Path]) -> tuple[dict[str, dict[str, Any]], dict[str, P
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         canaries.append(data["canary"])
         for tid, t in data["tickets"].items():
+            t["_fixed_maximum"] = bool(data.get("fixed_maximum"))
+            t["_set"], t["_frozen_agent_version"] = data.get("set"), data.get("frozen_agent_version")
             tickets[tid], private[tid] = t, p.parent
     return dict(sorted(tickets.items(), key=lambda kv: int(kv[0][1:]))), private, canaries
 
@@ -656,8 +675,10 @@ def report(run: Run, tickets: dict[str, dict[str, Any]], private: dict[str, Path
             checks = score_l1(tid, k, act, prs, issue_of, teams)
             if ws:
                 checks += [c for c in score_l23(tid, k, prs, private[tid], ws, selfcheck, act) if c.level <= level]
+            versions = sorted({str(b["agent_version"]) for c in (act.comments if act else [])
+                               for b in result_blocks(c["body"]) if b.get("agent_version")})
             results[tid] = {"issue": n, "slug": k["slug"], "commented": bool(act and act.comments),
-                            "checks": [c.__dict__ for c in checks]}
+                            "agent_versions": versions, "checks": [c.__dict__ for c in checks]}
     finally:
         if ws:
             ws.close()
@@ -686,13 +707,32 @@ def report(run: Run, tickets: dict[str, dict[str, Any]], private: dict[str, Path
     for lvl in range(1, level + 1):
         got, possible = totals[lvl]
         print(f"level {lvl}: {got}/{possible}" + (f" ({100 * got / possible:.0f}%)" if possible else ""))
+    sets = sorted({k["_set"] for tid, k in tickets.items() if k.get("_set") and tid in results})
+    if any(tickets[tid].get("_fixed_maximum") for tid in results):
+        print(f"maximum fixed by the key ({', '.join(sets) or 'fixed set'}): every check counts, whatever the "
+              "agent did")
+    frozen = sorted({str(k["_frozen_agent_version"]) for tid, k in tickets.items()
+                     if k.get("_frozen_agent_version") and tid in results})
+    seen = sorted({v for r in results.values() for v in r["agent_versions"]})
+    version_problems = [v for v in seen if frozen and (v not in frozen or v.endswith(".dirty"))]
+    if frozen:
+        unreported = [tid for tid, r in results.items() if r["commented"] and not r["agent_versions"]]
+        if version_problems:
+            flag = "  ! NOT THE FROZEN BUILD"
+        elif unreported or not seen:
+            flag = f"  ! no agent_version on {', '.join(unreported) or 'any ticket'}"
+        else:
+            flag = ""
+        print(f"agent version: {', '.join(seen) or 'none reported'} (frozen build: {', '.join(frozen)}){flag}")
     print("\nguardrails: " + ("all kept" if not broken else f"{len(broken)} broken"))
     for b in broken:
         print(f"  ! {b}")
 
     RUNS.mkdir(parents=True, exist_ok=True)
     out = RUNS / f"score-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
-    out.write_text(json.dumps({"since": run.since, "level": level, "tickets": results, "guardrails": broken,
+    out.write_text(json.dumps({"since": run.since, "level": level, "sets": sets, "agent_versions": seen,
+                               "frozen_agent_version": frozen, "agent_version_problems": version_problems,
+                               "tickets": results, "guardrails": broken,
                                "totals": {str(k): v for k, v in totals.items() if k <= level}}, indent=2) + "\n",
                    encoding="utf-8")
     print(f"\ndetails: {out}")

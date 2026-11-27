@@ -74,6 +74,13 @@ def hidden_test(co: Checkout, spec: dict[str, Any], private: Path, env: dict[str
                    {"PORTAL_SRC": str(co.billing / "portal" / "src"), **env})
     if spec["kind"] == "shipped_alone":
         return run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", spec["test"]], co.billing, env)
+    if spec["kind"] == "shipped_repeat":  # the same shipped test, run again in the same checkout
+        for n in range(spec.get("runs", 2)):
+            ok, out = run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", spec["test"]], co.billing,
+                          env)
+            if not ok:
+                return False, f"run {n + 1}: {out}"
+        return True, ""
     raise ValueError(f"unknown hidden test kind {spec['kind']!r}")
 
 
@@ -81,7 +88,8 @@ def shipped_suite(co: Checkout) -> tuple[bool, str]:
     for cmd, cwd in [
         ([sys.executable, "-m", "ruff", "check", "billing", "tests"], co.billing),
         ([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "--cov"], co.billing),
-        (["node", "--test", "test/money.test.ts", "test/dates.test.ts", "test/validate.test.ts"], co.billing / "portal"),
+        (["node", "--test", *sorted(f"test/{p.name}" for p in (co.billing / "portal" / "test").glob("*.test.ts"))],
+         co.billing / "portal"),
     ]:
         ok, out = run(cmd, cwd)
         if not ok:

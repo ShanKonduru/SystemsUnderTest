@@ -103,6 +103,10 @@ defects; several changed before they were built.
 | T15 | needs more info | Nothing useful, no version | none |
 | T16 | code bug, regression | "Worked last month", the version that worked | unit, API, UI |
 
+**Held-out set (T20-T39).** Twenty further tickets about billing service 1.4.0, with classes from the same list,
+are deliberately not catalogued here: they measure an agent, tuned on T01-T19, on tickets it hasn't seen. Their
+key is `rca-lab/private/fresh-key.yaml`, scored with a fixed maximum (see `rca-lab/README.md`).
+
 Every issue except T15 states the version the reporter saw (the `/health` `version`, e.g. `1.2.0`), so Level 1 can
 pick a regression window even after `main` moves on.
 

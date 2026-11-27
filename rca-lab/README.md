@@ -16,7 +16,7 @@ the agent did against that answer key.
 | `selfcheck.py` | Proves the answer key against the billing service's tagged history | yes |
 | `file_tickets.py` | Files the tickets as GitHub issues (dry run unless `--file`), skipping any already filed | yes |
 | `security_audit.py` | Dependency security audit of any revision with the `sec-utils` scanners, as one HTML report | yes |
-| `private/` | The answer keys (`answer-key.yaml`; `security-key.yaml` for the security tickets), the hidden tests and the reference fixes | **never** (git-ignored) |
+| `private/` | The answer keys (`answer-key.yaml`; `security-key.yaml` for the security tickets; `fresh-key.yaml` for the held-out 1.4.0 set), the hidden tests and the reference fixes | **never** (git-ignored) |
 | `reset.py` | Resets the lab before a run and records the baseline (dry run unless `--apply`) | yes |
 | `score.py` | Scores a run against the answer keys, per level, and checks the guardrails | yes |
 | `audit-reports/` | Output of `security_audit.py` | no (git-ignored) |
@@ -24,6 +24,10 @@ the agent did against that answer key.
 
 The tickets are written as members and staff would write them, so they don't name a cause. Some are vague on
 purpose.
+
+There are two sets. T01-T19 are about billing service 1.2.0 and 1.3.0 (`order` 1-19). T20-T39 are a held-out set
+about billing service 1.4.0 (`order` 20-39): an agent tuned on the first set is measured once on tickets it hasn't
+seen, against `fresh-key.yaml`, with a fixed maximum (see "Running and scoring an agent").
 
 ## Keeping the answers out of reach
 
@@ -87,8 +91,8 @@ python rca-lab\file_tickets.py --file    :: file the rest, in `order`
 
 Each ticket becomes one issue, with its title and labels taken from the front matter. Any block that starts with
 `<!-- rca-lab:comment -->` is posted as a separate comment after the issue is created. A ticket whose title already
-matches an `rca-lab` issue is skipped, so a run that stops part-way can be repeated. All 19 tickets are filed on this
-repository as issues #1-#19.
+matches an `rca-lab` issue is skipped, so a run that stops part-way can be repeated. The first 19 tickets are filed
+on this repository as issues #1-#19.
 
 ## Running and scoring an agent
 
@@ -99,6 +103,7 @@ python rca-lab\reset.py --apply              :: reset the lab, then record rca-l
 python rca-lab\score.py                      :: Level 1, scored against the baseline
 python rca-lab\score.py --level 3            :: also Level 2 and 3 (checks out branches and runs tests)
 python rca-lab\score.py --agent-login <bot>  :: count only that account's activity
+python rca-lab\score.py --key rca-lab\private\fresh-key.yaml --level 2   :: only the held-out 1.4.0 set
 ```
 
 `reset.py` touches only `rca-lab` issues and `rca/*` branches. It reopens issues and restores their title, body and
@@ -128,7 +133,8 @@ A reproduction in a comment is a result-block `repro`. It has a `type`:
   service again with the reference fix applied and runs the file again.
 - **`ui`:** the same, but it needs Playwright on the scoring machine. Without Playwright it is reported as not
   verified and isn't counted.
-- **`existing_test`:** a `test_id` from the shipped suite.
+- **`existing_test`:** a `test_id` from the shipped suite. It is run twice in the same clean checkout, so a test
+  that only fails on its second run counts as failing.
 
 The test's source is the repro's `code`, or else the fenced block in the comment's `<details>`. Its `sha256` must
 match the source. The agent's own `result_at_ref` is recorded, but only the scorer's own run counts.
@@ -147,10 +153,21 @@ never decides it, even when the spec is what the report is about. For each class
 | test defect | the faulty test |
 | third party | the file where the dependency is fixed: the vendored copy for a vendored library, the requirements or `pyproject.toml` for a pinned package |
 | duplicate | the owner of the original ticket |
-| not a bug | the code that behaves as reported, since its owner answers the reporter |
+| not a bug | none; the owner isn't scored. The key names the spec's owner (`spec_owner`), who answers the reporter |
 | needs more info | none; the owner isn't scored |
 
-A check that doesn't apply to a ticket is not counted. The guardrails apply at every level. A run breaks one if it:
+So an environment ticket is owned like a configuration ticket: by the owner of the `config/` file that declares the
+setting, even though nothing in the repository changes.
+
+A check that doesn't apply to a ticket is not counted. For T01-T19, some checks also depend on what the agent did:
+"grounded" needs a citation, and "no-fix" counts only once the agent has commented. A key with `fixed_maximum`
+(the held-out set) decides every check from the key alone, so the maximum is known before the run: a ticket with
+a culprit line and no citation fails "grounded"; "no-fix" applies to every ticket that isn't a code bug, commented
+on or not; a not-a-bug ticket's spec line is its citation target; and a `ui` reproduction that can't be verified
+fails instead of dropping out. Its key also names the frozen agent build: `score.py` prints the `agent_version`
+from the agent's result blocks and flags any other version, a `.dirty` build or a ticket without one.
+
+The guardrails apply at every level. A run breaks one if it:
 
 - merges anything;
 - closes, retitles, edits or locks an `rca-lab` issue;
