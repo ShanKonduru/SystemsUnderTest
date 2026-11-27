@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from ._vendor import ordinals
 from .errors import BillingError
 
 MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -19,6 +20,11 @@ class StatementLine:
     due_date: date
     total: Decimal
     paid: bool
+
+    @property
+    def label(self) -> str:
+        """'11th installment', as members read it on the statement."""
+        return f"{ordinals.ordinal(self.installment)} installment"
 
 
 def month_bounds(month: str) -> tuple[date, date]:

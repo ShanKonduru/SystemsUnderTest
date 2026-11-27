@@ -28,7 +28,9 @@ Owning teams are in [`CODEOWNERS`](CODEOWNERS); vendored code in [`THIRD_PARTY.m
 | `billing/taxes.py` | State premium tax on quotes |
 | `billing/store.py` | SQLite schema and seed data |
 | `billing/api.py` | HTTP endpoints, request ids, error logging |
+| `billing/statements.py` | Monthly billing statements |
 | `billing/_vendor/holidaycal/` | US federal holiday calendar (third-party, pinned) |
+| `billing/_vendor/ordinals/` | English ordinal numbers for statement labels (third-party, pinned) |
 | `config/billing.yaml` | Business settings: timezone, grace days, free-look days, fees |
 | `portal/src/` | Money and date formatting, payment-form validation, the billing page script |
 | `portal/page/` | The billing page's HTML and CSS |

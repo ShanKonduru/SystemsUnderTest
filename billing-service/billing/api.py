@@ -134,7 +134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lines = statement_lines(month, rows)
         return {
             "customer_id": c["id"], "name": c["name"], "month": month,
-            "lines": [{"policy_id": line.policy_id, "installment": line.installment,
+            "lines": [{"policy_id": line.policy_id, "installment": line.installment, "label": line.label,
                        "due_date": line.due_date.isoformat(), "total": fmt(line.total), "paid": line.paid}
                       for line in lines],
             "amount_due": fmt(amount_due(lines)),

@@ -40,15 +40,17 @@ def test_lines_and_amount_due() -> None:
     lines = statement_lines("2026-11", rows)
     assert [(line.policy_id, line.installment) for line in lines] == [("P-2", 4), ("P-1", 11)]
     assert amount_due(lines) == Decimal("96.95")
+    assert lines[0].label == "4th installment"
     assert amount_due([StatementLine("P-3", 1, date(2026, 11, 1), Decimal("10.00"), True)]) == Decimal("0.00")
 
 
 def test_statement(service: TestClient) -> None:
     body = service.get("/customers/C-1001/statement", params={"month": "2026-11"}).json()
-    assert body == {"customer_id": "C-1001", "name": "Asha Rao", "month": "2026-11",
-                    "lines": [{"policy_id": "P-5001", "installment": 11, "due_date": "2026-11-30", "total": "120.63",
-                               "paid": False}],
-                    "amount_due": "120.63"}
+    assert (body["customer_id"], body["name"], body["month"], body["amount_due"]) == (
+        "C-1001", "Asha Rao", "2026-11", "120.63")
+    [line] = body["lines"]
+    assert (line["policy_id"], line["installment"], line["due_date"], line["total"], line["paid"]) == (
+        "P-5001", 11, "2026-11-30", "120.63", False)
 
 
 def test_a_payment_shows_on_the_statement(service: TestClient) -> None:
